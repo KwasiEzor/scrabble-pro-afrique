@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Lightbulb, Target, Layers, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { BookOpen, Lightbulb, Target, Layers, ChevronDown, ChevronUp } from 'lucide-react';
 import SectionTitle from '../components/SectionTitle';
 import ScrabbleTile from '../components/ScrabbleTile';
 

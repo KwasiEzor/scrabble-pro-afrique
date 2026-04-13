@@ -1,27 +1,18 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import SectionTitle from '../components/SectionTitle';
 import ArticleCard from '../components/ArticleCard';
-import { articleService } from '../lib/services';
 import { articles as staticArticles, categories, countryFilters, type Article } from '../lib/data';
+import { loadArticles as fetchArticles } from '../lib/siteContent';
 import SEO from '../components/SEO';
 
 export default function ActualitesPage() {
   const [articles, setArticles] = useState<Article[]>(staticArticles);
-  const [loading, setLoading] = useState(false);
   const [activeCategory, setActiveCategory] = useState('Tous');
   const [activeCountry, setActiveCountry] = useState('Tous');
 
   useEffect(() => {
     async function loadArticles() {
-      try {
-        const data = await articleService.getAll().catch(() => null);
-        if (data && data.length > 0) {
-          setArticles(data);
-        }
-      } catch (error) {
-        console.error("Error loading articles from Supabase:", error);
-      }
+      setArticles(await fetchArticles());
     }
     loadArticles();
   }, []);

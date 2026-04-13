@@ -1,25 +1,17 @@
 import { useState, useEffect } from 'react';
 import SectionTitle from '../components/SectionTitle';
 import PlayerCard from '../components/PlayerCard';
-import { playerService } from '../lib/services';
 import { players as staticPlayers } from '../lib/data';
 import type { Player } from '../lib/data';
+import { loadPlayers as fetchPlayers } from '../lib/siteContent';
 import SEO from '../components/SEO';
 
 export default function JoueursPage() {
   const [players, setPlayers] = useState<Player[]>(staticPlayers);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     async function loadPlayers() {
-      try {
-        const data = await playerService.getAll().catch(() => null);
-        if (data && data.length > 0) {
-          setPlayers(data);
-        }
-      } catch (error) {
-        console.error("Error loading players:", error);
-      }
+      setPlayers(await fetchPlayers());
     }
     loadPlayers();
   }, []);

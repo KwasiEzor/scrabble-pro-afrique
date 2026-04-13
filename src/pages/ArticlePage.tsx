@@ -1,35 +1,32 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Clock, Calendar, Share2, Bookmark, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
-import { articleService } from '../lib/services';
+import { ArrowLeft, Clock, Share2, Bookmark, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { articles as staticArticles } from '../lib/data';
 import type { Article } from '../lib/data';
+import { getSafeArticleParagraphs, loadArticleBySlug, loadArticles } from '../lib/siteContent';
 import SEO from '../components/SEO';
 
 export default function ArticlePage() {
   const { slug } = useParams();
   const [article, setArticle] = useState<Article | null>(staticArticles.find(a => a.slug === slug) || null);
   const [related, setRelated] = useState<Article[]>(staticArticles.filter(a => a.slug !== slug && a.category === article?.category));
-  const [loading, setLoading] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
     async function loadData() {
       if (!slug) return;
-      try {
-        const data = await articleService.getBySlug(slug).catch(() => null);
-        if (data) {
-          setArticle(data);
-          
-          const allArticles = await articleService.getAll().catch(() => []);
-          const filtered = allArticles.filter(a => a.slug !== slug && a.category === data.category);
-          setRelated(filtered.length > 0 ? filtered : staticArticles.filter(a => a.slug !== slug && a.category === data.category));
-        }
-      } catch (error) {
-        console.error("Error loading article from Supabase:", error);
+      const data = await loadArticleBySlug(slug);
+
+      if (data) {
+        setArticle(data);
+
+        const allArticles = await loadArticles();
+        const filtered = allArticles.filter(a => a.slug !== slug && a.category === data.category);
+        setRelated(filtered.length > 0 ? filtered : staticArticles.filter(a => a.slug !== slug && a.category === data.category));
       }
     }
+
     loadData();
   }, [slug]);
 
@@ -145,7 +142,13 @@ export default function ArticlePage() {
             ))}
           </div>
 
-          <div dangerouslySetInnerHTML={{ __html: article.content }} />
+          <div className="space-y-6">
+            {getSafeArticleParagraphs(article.content).map((paragraph) => (
+              <p key={paragraph} className="text-white/70 leading-relaxed">
+                {paragraph}
+              </p>
+            ))}
+          </div>
         </motion.div>
 
         {/* Footer Navigation */}

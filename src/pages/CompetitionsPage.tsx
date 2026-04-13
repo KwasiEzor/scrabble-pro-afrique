@@ -1,26 +1,18 @@
 import { useState, useEffect } from 'react';
 import SectionTitle from '../components/SectionTitle';
 import CompetitionCard from '../components/CompetitionCard';
-import { competitionService } from '../lib/services';
 import { competitions as staticCompetitions } from '../lib/data';
 import type { Competition } from '../lib/data';
+import { loadCompetitions as fetchCompetitions } from '../lib/siteContent';
 import SEO from '../components/SEO';
 
 export default function CompetitionsPage() {
   const [competitions, setCompetitions] = useState<Competition[]>(staticCompetitions);
-  const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'ongoing' | 'completed'>('all');
 
   useEffect(() => {
     async function loadCompetitions() {
-      try {
-        const data = await competitionService.getAll().catch(() => null);
-        if (data && data.length > 0) {
-          setCompetitions(data);
-        }
-      } catch (error) {
-        console.error("Error loading competitions from Supabase:", error);
-      }
+      setCompetitions(await fetchCompetitions());
     }
     loadCompetitions();
   }, []);
@@ -49,7 +41,7 @@ export default function CompetitionsPage() {
           ].map(({ key, label }) => (
             <button
               key={key}
-              onClick={() => setFilter(key as any)}
+              onClick={() => setFilter(key as typeof filter)}
               className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${
                 filter === key
                   ? 'bg-gold text-bg-primary shadow-lg shadow-gold/20 border border-gold'

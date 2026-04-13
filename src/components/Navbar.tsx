@@ -3,12 +3,12 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Menu, X, Search, User, ChevronDown, 
-  Newspaper, Trophy, Users, Globe, BookOpen, 
+  Users, Globe, BookOpen, 
   Image as ImageIcon, LayoutDashboard, Github, Twitter 
 } from 'lucide-react';
 import { useAppStore } from '../lib/store';
+import { socialLinks } from '../lib/siteConfig';
 import SearchOverlay from './SearchOverlay';
-import { articles, competitions, players } from '../lib/data';
 
 const navLinks = [
   { label: 'Actualités', path: '/actualites' },
@@ -30,16 +30,16 @@ export default function Navbar() {
   const location = useLocation();
   const navRef = useRef<HTMLDivElement>(null);
 
+  const closeMenus = () => {
+    setMobileMenuOpen(false);
+    setEcosystemOpen(false);
+  };
+
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  useEffect(() => {
-    setMobileMenuOpen(false);
-    setEcosystemOpen(false);
-  }, [location.pathname, setMobileMenuOpen]);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -84,6 +84,7 @@ export default function Navbar() {
                 <Link
                   key={link.path}
                   to={link.path}
+                  onClick={closeMenus}
                   className={`px-4 py-2 text-sm font-medium transition-colors ${
                     location.pathname === link.path ? 'text-emerald-light' : 'text-text-secondary hover:text-white'
                   }`}
@@ -118,6 +119,7 @@ export default function Navbar() {
                           <Link
                             key={item.path}
                             to={item.path}
+                            onClick={closeMenus}
                             className="flex items-start gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group"
                           >
                             <div className="w-10 h-10 rounded-lg bg-[#242830] flex items-center justify-center text-text-muted group-hover:text-gold transition-colors">
@@ -131,7 +133,7 @@ export default function Navbar() {
                         ))}
                       </div>
                       <div className="mt-3 pt-3 border-t border-white/5">
-                        <Link to="/admin" className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-emerald/10 text-emerald-light text-xs font-black uppercase tracking-widest hover:bg-emerald/20 transition-all">
+                        <Link to="/admin" onClick={closeMenus} className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-emerald/10 text-emerald-light text-xs font-black uppercase tracking-widest hover:bg-emerald/20 transition-all">
                           <LayoutDashboard size={14} />
                           Administration
                         </Link>
@@ -157,12 +159,16 @@ export default function Navbar() {
               </button>
 
               <div className="flex items-center gap-2 border-l border-white/10 pl-4">
-                <a href="#" className="p-2 text-text-secondary hover:text-emerald-light transition-colors hidden sm:block" aria-label="Github">
-                  <Github size={20} />
-                </a>
-                <a href="#" className="p-2 text-text-secondary hover:text-emerald-light transition-colors hidden sm:block" aria-label="Twitter">
-                  <Twitter size={20} />
-                </a>
+                {socialLinks.github ? (
+                  <a href={socialLinks.github} target="_blank" rel="noreferrer" className="p-2 text-text-secondary hover:text-emerald-light transition-colors hidden sm:block" aria-label="Github">
+                    <Github size={20} />
+                  </a>
+                ) : null}
+                {socialLinks.twitter ? (
+                  <a href={socialLinks.twitter} target="_blank" rel="noreferrer" className="p-2 text-text-secondary hover:text-emerald-light transition-colors hidden sm:block" aria-label="Twitter">
+                    <Twitter size={20} />
+                  </a>
+                ) : null}
                 <Link to="/admin" className="p-2 text-text-secondary hover:text-gold transition-colors" aria-label="Account">
                   <User size={20} />
                 </Link>
@@ -198,7 +204,7 @@ export default function Navbar() {
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 gap-4">
                     {navLinks.map(link => (
-                      <Link key={link.path} to={link.path} className="text-2xl font-bold text-white">{link.label}</Link>
+                      <Link key={link.path} to={link.path} onClick={closeMenus} className="text-2xl font-bold text-white">{link.label}</Link>
                     ))}
                   </div>
                   
@@ -206,7 +212,7 @@ export default function Navbar() {
                     <h4 className="text-[10px] font-black text-emerald-light uppercase tracking-widest">Écosystème</h4>
                     <div className="grid grid-cols-1 gap-6">
                       {ecosystemLinks.map(item => (
-                        <Link key={item.path} to={item.path} className="flex items-center gap-4 group">
+                        <Link key={item.path} to={item.path} onClick={closeMenus} className="flex items-center gap-4 group">
                           <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-text-muted">
                             <item.icon size={24} />
                           </div>
@@ -221,7 +227,7 @@ export default function Navbar() {
                 </div>
 
                 <div className="pt-8 mt-8 border-t border-white/5">
-                  <Link to="/admin" className="flex items-center justify-center gap-3 w-full py-4 rounded-xl bg-white/5 border border-white/10 text-white font-bold">
+                  <Link to="/admin" onClick={closeMenus} className="flex items-center justify-center gap-3 w-full py-4 rounded-xl bg-white/5 border border-white/10 text-white font-bold">
                     <LayoutDashboard size={20} />
                     Administration
                   </Link>

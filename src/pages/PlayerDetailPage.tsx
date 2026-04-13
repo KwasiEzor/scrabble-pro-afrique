@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Trophy, TrendingUp, Star, Users } from 'lucide-react';
-import { playerService } from '../lib/services';
 import { players as staticPlayers, articles as staticArticles } from '../lib/data';
 import type { Player, Article } from '../lib/data';
+import { loadPlayerBySlug } from '../lib/siteContent';
 import ArticleCard from '../components/ArticleCard';
 import SEO from '../components/SEO';
 
@@ -12,21 +12,18 @@ export default function PlayerDetailPage() {
   const { slug } = useParams();
   const [player, setPlayer] = useState<Player | null>(staticPlayers.find(p => p.slug === slug) || null);
   const [relatedArticles, setRelatedArticles] = useState<Article[]>(staticArticles.filter(a => a.country === player?.country).slice(0, 3));
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     async function loadData() {
       if (!slug) return;
-      try {
-        const data = await playerService.getBySlug(slug).catch(() => null);
-        if (data) {
-          setPlayer(data);
-          setRelatedArticles(staticArticles.filter(a => a.country === data.country).slice(0, 3));
-        }
-      } catch (error) {
-        console.error("Error loading player from Supabase:", error);
+      const data = await loadPlayerBySlug(slug);
+
+      if (data) {
+        setPlayer(data);
+        setRelatedArticles(staticArticles.filter(a => a.country === data.country).slice(0, 3));
       }
     }
+
     loadData();
   }, [slug]);
 

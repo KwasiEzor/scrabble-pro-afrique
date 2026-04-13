@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Users, Building2, Trophy, Globe } from 'lucide-react';
-import { countryService } from '../lib/services';
 import { countries as staticCountries, players as staticPlayers, articles as staticArticles } from '../lib/data';
 import type { Country, Player, Article } from '../lib/data';
+import { loadCountryBySlug } from '../lib/siteContent';
 import PlayerCard from '../components/PlayerCard';
 import ArticleCard from '../components/ArticleCard';
 import SEO from '../components/SEO';
@@ -14,22 +14,19 @@ export default function CountryDetailPage() {
   const [country, setCountry] = useState<Country | null>(staticCountries.find(c => c.slug === slug) || null);
   const [countryPlayers, setCountryPlayers] = useState<Player[]>(staticPlayers.filter(p => p.country === country?.name));
   const [countryArticles, setCountryArticles] = useState<Article[]>(staticArticles.filter(a => a.country === country?.name).slice(0, 3));
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     async function loadData() {
       if (!slug) return;
-      try {
-        const data = await countryService.getBySlug(slug).catch(() => null);
-        if (data) {
-          setCountry(data);
-          setCountryPlayers(staticPlayers.filter(p => p.country === data.name));
-          setCountryArticles(staticArticles.filter(a => a.country === data.name).slice(0, 3));
-        }
-      } catch (error) {
-        console.error("Error loading country from Supabase:", error);
+      const data = await loadCountryBySlug(slug);
+
+      if (data) {
+        setCountry(data);
+        setCountryPlayers(staticPlayers.filter(p => p.country === data.name));
+        setCountryArticles(staticArticles.filter(a => a.country === data.name).slice(0, 3));
       }
     }
+
     loadData();
   }, [slug]);
 

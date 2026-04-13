@@ -6,9 +6,9 @@ import ScrabbleTile from '../components/ScrabbleTile';
 import SectionTitle from '../components/SectionTitle';
 import ArticleCard from '../components/ArticleCard';
 import CompetitionCard from '../components/CompetitionCard';
-import { articleService, playerService, competitionService, countryService } from '../lib/services';
 import { articles as staticArticles, players as staticPlayers, competitions as staticCompetitions, countries as staticCountries } from '../lib/data';
 import type { Article, Player, Competition, Country } from '../lib/data';
+import { loadHomeContent } from '../lib/siteContent';
 import SEO from '../components/SEO';
 
 export default function HomePage() {
@@ -20,35 +20,15 @@ export default function HomePage() {
   const [upcomingComps, setUpcomingComps] = useState<Competition[]>(staticCompetitions.filter(c => c.status !== 'completed').slice(0, 3));
   const [featuredPlayer, setFeaturedPlayer] = useState<Player | null>(staticPlayers.find(p => p.featured) || staticPlayers[0]);
   const [topCountries, setTopCountries] = useState<Country[]>(staticCountries.slice(0, 6));
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     async function loadHomeData() {
-      try {
-        // We still attempt to load from Supabase, but we already have static data as base
-        const [articlesData, competitionsData, playersData, countriesData] = await Promise.all([
-          articleService.getAll().catch(() => null),
-          competitionService.getUpcoming().catch(() => null),
-          playerService.getAll().catch(() => null),
-          countryService.getAll().catch(() => null)
-        ]);
-
-        if (articlesData && articlesData.length > 0) {
-          setFeaturedArticles(articlesData.filter(a => a.featured));
-          setOtherArticles(articlesData.filter(a => !a.featured).slice(0, 3));
-        }
-        if (competitionsData && competitionsData.length > 0) {
-          setUpcomingComps(competitionsData.slice(0, 3));
-        }
-        if (playersData && playersData.length > 0) {
-          setFeaturedPlayer(playersData.find(p => p.featured) || playersData[0]);
-        }
-        if (countriesData && countriesData.length > 0) {
-          setTopCountries(countriesData.slice(0, 6));
-        }
-      } catch (error) {
-        console.error("Error loading home data from Supabase:", error);
-      }
+      const { articles, competitions, players, countries } = await loadHomeContent();
+      setFeaturedArticles(articles.filter(a => a.featured));
+      setOtherArticles(articles.filter(a => !a.featured).slice(0, 3));
+      setUpcomingComps(competitions.slice(0, 3));
+      setFeaturedPlayer(players.find(p => p.featured) || players[0] || null);
+      setTopCountries(countries.slice(0, 6));
     }
     loadHomeData();
   }, []);

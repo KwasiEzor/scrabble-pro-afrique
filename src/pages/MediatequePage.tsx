@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Image, Film, X } from 'lucide-react';
+import { Image, X } from 'lucide-react';
 import SectionTitle from '../components/SectionTitle';
 
 const mediaItems = [

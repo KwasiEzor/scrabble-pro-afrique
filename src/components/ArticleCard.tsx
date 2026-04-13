@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import type { Variants } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Clock, ArrowUpRight, Globe } from 'lucide-react';
 import type { Article } from '../lib/data';
@@ -10,12 +11,12 @@ interface ArticleCardProps {
 }
 
 export default function ArticleCard({ article, variant = 'default', index = 0 }: ArticleCardProps) {
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
     visible: { 
       opacity: 1, 
       y: 0,
-      transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: index * 0.1 }
+      transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] as const, delay: index * 0.1 }
     }
   };
 

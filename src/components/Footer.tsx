@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Facebook, Twitter, Instagram, Youtube, Mail, MapPin, Phone, ArrowUpRight } from 'lucide-react';
+import { Facebook, Twitter, Instagram, Youtube, ArrowUpRight } from 'lucide-react';
+import { socialLinks } from '../lib/siteConfig';
 
 const footerLinks = {
   'Navigation': [
@@ -49,14 +50,16 @@ export default function Footer() {
             </p>
             <div className="flex gap-3">
               {[
-                { icon: Facebook, label: 'Facebook' },
-                { icon: Twitter, label: 'Twitter' },
-                { icon: Instagram, label: 'Instagram' },
-                { icon: Youtube, label: 'YouTube' },
-              ].map(({ icon: Icon, label }) => (
+                { icon: Facebook, label: 'Facebook', href: socialLinks.facebook },
+                { icon: Twitter, label: 'Twitter', href: socialLinks.twitter },
+                { icon: Instagram, label: 'Instagram', href: socialLinks.instagram },
+                { icon: Youtube, label: 'YouTube', href: socialLinks.youtube },
+              ].filter((item) => item.href).map(({ icon: Icon, label, href }) => (
                 <a
                   key={label}
-                  href="#"
+                  href={href ?? '#'}
+                  target="_blank"
+                  rel="noreferrer"
                   className="w-10 h-10 rounded-xl bg-bg-tertiary flex items-center justify-center text-text-muted hover:text-emerald-light hover:bg-emerald/10 transition-all"
                   aria-label={label}
                 >

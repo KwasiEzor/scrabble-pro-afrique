@@ -1,34 +1,49 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Mail, MapPin, Phone, MessageCircle, Loader2 } from 'lucide-react';
+import { Send, Mail, MapPin, Phone, Loader2 } from 'lucide-react';
 import SectionTitle from '../components/SectionTitle';
-import { messageService } from '../lib/services';
+import TurnstileWidget from '../components/TurnstileWidget';
+import { submissionService } from '../lib/submissionService';
+import { isTurnstileConfigured } from '../lib/siteConfig';
 import SEO from '../components/SEO';
 
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const [captchaRefreshKey, setCaptchaRefreshKey] = useState(0);
   const [formData, setFormData] = useState({
-    name: '', email: '', type: 'general', subject: '', message: ''
+    name: '', email: '', type: 'general', subject: '', message: '', website: ''
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!captchaToken) {
+      setError('Veuillez compléter la vérification anti-spam avant d’envoyer votre message.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      await messageService.send({
+      await submissionService.submitMessage({
         name: formData.name,
         email: formData.email,
         subject: formData.subject,
         content: formData.message,
-        tag: formData.type
+        tag: `contact:${formData.type}`,
+        website: formData.website,
+        captchaToken,
       });
       setSubmitted(true);
+      setCaptchaToken(null);
+      setCaptchaRefreshKey(current => current + 1);
     } catch (err) {
-      console.error("Error sending message:", err);
-      setError("Une erreur est survenue lors de l'envoi du message. Veuillez réessayer.");
+      setError(err instanceof Error ? err.message : "Une erreur est survenue lors de l'envoi du message. Veuillez réessayer.");
+      setCaptchaToken(null);
+      setCaptchaRefreshKey(current => current + 1);
     } finally {
       setLoading(false);
     }
@@ -106,7 +121,7 @@ export default function ContactPage() {
                   <h3 className="font-[var(--font-display)] text-3xl font-bold text-white mb-4">Message Transmis</h3>
                   <p className="text-text-secondary text-lg font-light italic">"Votre demande a été enregistrée avec succès. Notre équipe reviendra vers vous sous 48h."</p>
                   <button
-                    onClick={() => { setSubmitted(false); setFormData({ name: '', email: '', type: 'general', subject: '', message: '' }); }}
+                    onClick={() => { setSubmitted(false); setFormData({ name: '', email: '', type: 'general', subject: '', message: '', website: '' }); }}
                     className="mt-10 px-8 py-3 rounded-full bg-white/5 border border-white/10 text-xs font-black uppercase tracking-widest text-white hover:bg-white/10 transition-all active:scale-95"
                   >
                     Nouveau message
@@ -144,6 +159,18 @@ export default function ContactPage() {
                     </div>
                   </div>
                   <div className="space-y-2">
+                    <label className="sr-only" htmlFor="contact-website">Website</label>
+                    <input
+                      id="contact-website"
+                      type="text"
+                      tabIndex={-1}
+                      autoComplete="off"
+                      value={formData.website}
+                      onChange={e => setFormData({ ...formData, website: e.target.value })}
+                      className="hidden"
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Type de Requête</label>
                     <select
                       value={formData.type}
@@ -178,9 +205,19 @@ export default function ContactPage() {
                       placeholder="Comment pouvons-nous vous aider ?"
                     />
                   </div>
+                  <div className="space-y-3">
+                    <TurnstileWidget
+                      onTokenChange={setCaptchaToken}
+                      onError={setCaptchaError}
+                      refreshKey={captchaRefreshKey}
+                    />
+                    {captchaError ? (
+                      <p className="text-sm text-amber-200">{captchaError}</p>
+                    ) : null}
+                  </div>
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || !isTurnstileConfigured}
                     className="w-full sm:w-auto px-10 py-5 rounded-2xl bg-gradient-to-r from-emerald to-emerald-dark text-white font-black uppercase tracking-[0.2em] text-[10px] hover:shadow-2xl hover:shadow-emerald/30 transition-all flex items-center justify-center gap-3 disabled:opacity-50 active:scale-95"
                   >
                     {loading ? (

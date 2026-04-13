@@ -1,18 +1,53 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Users, Calendar, Newspaper, Facebook, Twitter, Instagram, Youtube, Heart, MessageCircle } from 'lucide-react';
+import { Send, Calendar, Newspaper, Facebook, Twitter, Instagram, Youtube, Heart, Loader2 } from 'lucide-react';
 import SectionTitle from '../components/SectionTitle';
 import ScrabbleTile from '../components/ScrabbleTile';
+import TurnstileWidget from '../components/TurnstileWidget';
+import { submissionService } from '../lib/submissionService';
+import { isTurnstileConfigured, socialLinks } from '../lib/siteConfig';
 
 export default function CommunautePage() {
   const [formType, setFormType] = useState<'article' | 'event' | 'contribution'>('article');
   const [submitted, setSubmitted] = useState(false);
-  const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const [captchaRefreshKey, setCaptchaRefreshKey] = useState(0);
+  const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '', website: '' });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 3000);
+    if (!captchaToken) {
+      setError('Veuillez compléter la vérification anti-spam avant de proposer une contribution.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      await submissionService.submitMessage({
+        name: formData.name,
+        email: formData.email,
+        subject: formData.subject,
+        content: formData.message,
+        tag: `community:${formType}`,
+        website: formData.website,
+        captchaToken,
+      });
+      setSubmitted(true);
+      setFormData({ name: '', email: '', subject: '', message: '', website: '' });
+      setCaptchaToken(null);
+      setCaptchaRefreshKey(current => current + 1);
+    } catch {
+      setError("L'envoi a échoué. Veuillez réessayer dans quelques instants.");
+      setCaptchaToken(null);
+      setCaptchaRefreshKey(current => current + 1);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -35,17 +70,21 @@ export default function CommunautePage() {
         {/* Social links */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-16">
           {[
-            { icon: Facebook, label: 'Facebook', color: 'hover:bg-blue-600/20 hover:border-blue-500/30 hover:text-blue-400', followers: '12K' },
-            { icon: Twitter, label: 'Twitter', color: 'hover:bg-sky-500/20 hover:border-sky-400/30 hover:text-sky-400', followers: '5.2K' },
-            { icon: Instagram, label: 'Instagram', color: 'hover:bg-pink-500/20 hover:border-pink-400/30 hover:text-pink-400', followers: '8.7K' },
-            { icon: Youtube, label: 'YouTube', color: 'hover:bg-red-500/20 hover:border-red-400/30 hover:text-red-400', followers: '3.1K' },
-          ].map(({ icon: Icon, label, color, followers }, i) => (
-            <motion.a
-              key={label}
-              href="#"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+            { icon: Facebook, label: 'Facebook', color: 'hover:bg-blue-600/20 hover:border-blue-500/30 hover:text-blue-400', followers: '12K', href: socialLinks.facebook },
+            { icon: Twitter, label: 'Twitter', color: 'hover:bg-sky-500/20 hover:border-sky-400/30 hover:text-sky-400', followers: '5.2K', href: socialLinks.twitter },
+            { icon: Instagram, label: 'Instagram', color: 'hover:bg-pink-500/20 hover:border-pink-400/30 hover:text-pink-400', followers: '8.7K', href: socialLinks.instagram },
+            { icon: Youtube, label: 'YouTube', color: 'hover:bg-red-500/20 hover:border-red-400/30 hover:text-red-400', followers: '3.1K', href: socialLinks.youtube },
+            ]
+            .filter((item) => item.href)
+            .map(({ icon: Icon, label, color, followers, href }, i) => (
+              <motion.a
+                key={label}
+                href={href ?? '#'}
+                target="_blank"
+                rel="noreferrer"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
               className={`glass rounded-2xl p-6 text-center border border-border-subtle transition-all duration-300 ${color}`}
             >
@@ -98,6 +137,21 @@ export default function CommunautePage() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
+              {error ? (
+                <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                  {error}
+                </div>
+              ) : null}
+              <label className="sr-only" htmlFor="community-website">Website</label>
+              <input
+                id="community-website"
+                type="text"
+                tabIndex={-1}
+                autoComplete="off"
+                value={formData.website}
+                onChange={e => setFormData({ ...formData, website: e.target.value })}
+                className="hidden"
+              />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-2">Nom complet</label>
@@ -144,12 +198,23 @@ export default function CommunautePage() {
                   placeholder="Décrivez votre contribution en détail..."
                 />
               </div>
+              <div className="space-y-3">
+                <TurnstileWidget
+                  onTokenChange={setCaptchaToken}
+                  onError={setCaptchaError}
+                  refreshKey={captchaRefreshKey}
+                />
+                {captchaError ? (
+                  <p className="text-sm text-amber-200">{captchaError}</p>
+                ) : null}
+              </div>
               <button
                 type="submit"
+                disabled={loading || !isTurnstileConfigured}
                 className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-emerald to-emerald-dark text-white font-semibold hover:shadow-lg hover:shadow-emerald/25 transition-all"
               >
-                <Send size={18} />
-                Envoyer
+                {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                {loading ? 'Envoi...' : 'Envoyer'}
               </button>
             </form>
           )}

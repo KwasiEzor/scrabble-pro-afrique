@@ -1,937 +1,1647 @@
-import { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  LayoutDashboard, FileText, Trophy, Users, Globe, Image as ImageIcon, Mail, Settings, 
-  Plus, Edit, Trash2, Eye, EyeOff, Search, ChevronRight, BarChart3, TrendingUp, 
-  Calendar, LogOut, Shield, ArrowUpRight, Bell, Filter, Download, MoreHorizontal,
-  ChevronLeft, Command, Check, AlertCircle, ExternalLink, Menu, Activity,
-  MousePointer2, Clock, Share2, MessageSquare, Zap
-} from 'lucide-react';
-import { articles, players, competitions, countries } from '../lib/data';
-import { supabase } from '../lib/supabase';
-import SEO from '../components/SEO';
+import { useCallback, useEffect, useState } from 'react'
+import type { FormEvent, ReactNode } from 'react'
+import type { Session } from '@supabase/supabase-js'
+import {
+  FileText,
+  Globe,
+  Loader2,
+  LogOut,
+  Mail,
+  Pencil,
+  Plus,
+  RefreshCcw,
+  Save,
+  ShieldAlert,
+  Trash2,
+  Trophy,
+  Users,
+} from 'lucide-react'
+import SEO from '../components/SEO'
+import type { Article, Competition, Country, Player } from '../lib/data'
+import {
+  articleService,
+  competitionService,
+  countryService,
+  type Message,
+  messageService,
+  playerService,
+} from '../lib/services'
+import { loadArticles, loadCompetitions, loadCountries, loadPlayers } from '../lib/siteContent'
+import { hasAdminAccess, isSupabaseConfigured, supabase } from '../lib/supabase'
 
-// --- Types & Constants ---
+type AdminTab = 'dashboard' | 'articles' | 'competitions' | 'players' | 'countries' | 'messages'
 
-const sidebarItems = [
-  { icon: LayoutDashboard, label: 'Overview', key: 'dashboard' },
-  { icon: Activity, label: 'Analytics', key: 'analytics' },
-  { icon: FileText, label: 'Content', key: 'articles' },
-  { icon: Trophy, label: 'Events', key: 'competitions' },
-  { icon: Users, label: 'Talents', key: 'players' },
-  { icon: Globe, label: 'Federations', key: 'countries' },
-  { icon: ImageIcon, label: 'Assets', key: 'media' },
-  { icon: Mail, label: 'Inquiries', key: 'messages' },
-  { icon: Settings, label: 'Settings', key: 'settings' },
-];
-
-// --- Sophisticated SVG Charts ---
-
-function InteractionChart() {
-  const points = [10, 40, 30, 70, 50, 90, 80, 110, 100, 140, 130, 170];
-  const max = Math.max(...points);
-  const width = 400;
-  const height = 120;
-  
-  const pathData = points.map((p, i) => {
-    const x = (i / (points.length - 1)) * width;
-    const y = height - (p / max) * height;
-    return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
-  }).join(' ');
-
-  const areaData = `${pathData} L ${width} ${height} L 0 ${height} Z`;
-
-  return (
-    <div className="w-full h-32 relative group">
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
-        <defs>
-          <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgba(255, 255, 255, 0.1)" />
-            <stop offset="100%" stopColor="rgba(255, 255, 255, 0)" />
-          </linearGradient>
-        </defs>
-        <path d={areaData} fill="url(#chartGradient)" />
-        <path d={pathData} fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-40 group-hover:opacity-100 transition-opacity duration-700" />
-        {points.map((p, i) => (
-          <circle 
-            key={i} 
-            cx={(i / (points.length - 1)) * width} 
-            cy={height - (p / max) * height} 
-            r="2" 
-            fill="white" 
-            className="opacity-0 group-hover:opacity-100 transition-opacity duration-300" 
-            style={{ transitionDelay: `${i * 30}ms` }}
-          />
-        ))}
-      </svg>
-    </div>
-  );
+type CountryFormState = {
+  slug: string
+  name: string
+  code: string
+  flag: string
+  image: string
+  federation: string
+  clubs: string
+  players: string
+  description: string
+  tags: string
 }
 
-function BarChart({ data }: { data: number[] }) {
-  const max = Math.max(...data);
-  return (
-    <div className="flex items-end gap-1 h-12 w-full">
-      {data.map((v, i) => (
-        <motion.div
-          key={i}
-          initial={{ height: 0 }}
-          animate={{ height: `${(v / max) * 100}%` }}
-          transition={{ delay: i * 0.05, duration: 0.5, ease: "circOut" }}
-          className="flex-1 bg-white/10 group-hover:bg-white/30 transition-colors rounded-t-[1px]"
-        />
-      ))}
-    </div>
-  );
+type PlayerFormState = {
+  slug: string
+  name: string
+  countryId: string
+  image: string
+  ranking: string
+  rating: string
+  titles: string
+  tags: string
+  bio: string
+  club: string
+  featured: boolean
 }
 
-// --- Main Admin Component ---
+type ArticleFormState = {
+  slug: string
+  title: string
+  excerpt: string
+  content: string
+  image: string
+  category: string
+  tags: string
+  countryId: string
+  author: string
+  authorImage: string
+  publishedAt: string
+  readTime: string
+  featured: boolean
+}
 
-export default function AdminPage() {
-  const [activeSection, setActiveSection] = useState('dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [keepLoggedIn, setKeepLoggedIn] = useState(false);
+type CompetitionFormState = {
+  slug: string
+  name: string
+  location: string
+  countryId: string
+  startDate: string
+  endDate: string
+  status: Competition['status']
+  image: string
+  description: string
+  participants: string
+  type: string
+  tags: string
+  results: string
+}
 
-  useEffect(() => {
-    const session = localStorage.getItem('admin_session') || sessionStorage.getItem('admin_session');
-    if (session === 'active') {
-      setIsLoggedIn(true);
-    }
-  }, []);
+const tabs: { key: AdminTab; label: string }[] = [
+  { key: 'dashboard', label: 'Overview' },
+  { key: 'articles', label: 'Articles' },
+  { key: 'competitions', label: 'Compétitions' },
+  { key: 'players', label: 'Joueurs' },
+  { key: 'countries', label: 'Pays' },
+  { key: 'messages', label: 'Messages' },
+]
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setTimeout(() => {
-      setIsLoggedIn(true);
-      setLoading(false);
-      if (keepLoggedIn) {
-        localStorage.setItem('admin_session', 'active');
-      } else {
-        sessionStorage.setItem('admin_session', 'active');
-      }
-    }, 1200);
-  };
+function createCountryForm(): CountryFormState {
+  return {
+    slug: '',
+    name: '',
+    code: '',
+    flag: '🌍',
+    image: '',
+    federation: '',
+    clubs: '0',
+    players: '0',
+    description: '',
+    tags: '',
+  }
+}
 
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    localStorage.removeItem('admin_session');
-    sessionStorage.removeItem('admin_session');
-  };
+function createPlayerForm(): PlayerFormState {
+  return {
+    slug: '',
+    name: '',
+    countryId: '',
+    image: '',
+    ranking: '0',
+    rating: '0',
+    titles: '',
+    tags: '',
+    bio: '',
+    club: '',
+    featured: false,
+  }
+}
 
-  if (!isLoggedIn) {
-    return (
-      <div className="min-h-screen bg-[#020202] text-white flex items-center justify-center p-6 selection:bg-white/10 overflow-hidden relative">
-        <SEO title="Secure Authentication | Scrabble Pro" />
-        
-        {/* Cinematic Background Elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/10 blur-[120px] rounded-full animate-pulse" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-white/5 blur-[120px] rounded-full animate-pulse" style={{ animationDelay: '1s' }} />
-          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-50 contrast-150 mix-blend-overlay" />
-          
-          {/* Cyber Grid */}
-          <div 
-            className="absolute inset-0 opacity-[0.03]" 
-            style={{ 
-              backgroundImage: `linear-gradient(to right, #ffffff 1px, transparent 1px), linear-gradient(to bottom, #ffffff 1px, transparent 1px)`,
-              backgroundSize: '60px 60px'
-            }} 
-          />
-        </div>
+function createArticleForm(): ArticleFormState {
+  return {
+    slug: '',
+    title: '',
+    excerpt: '',
+    content: '',
+    image: '',
+    category: '',
+    tags: '',
+    countryId: '',
+    author: '',
+    authorImage: '',
+    publishedAt: '',
+    readTime: '',
+    featured: false,
+  }
+}
 
-        <motion.div 
-          initial={{ opacity: 0, y: 20, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full max-w-[440px] relative z-10"
-        >
-          <div className="relative group">
-            {/* Glow Border */}
-            <div className="absolute -inset-[1px] bg-gradient-to-b from-white/20 to-transparent rounded-[32px] blur-sm opacity-50 group-hover:opacity-100 transition-opacity duration-700" />
-            
-            <div className="relative bg-[#0A0A0A]/80 backdrop-blur-2xl border border-white/10 rounded-[32px] p-10 lg:p-12 shadow-2xl">
-              <div className="flex flex-col items-center mb-12">
-                <motion.div 
-                  whileHover={{ rotateY: 180 }}
-                  transition={{ duration: 0.6 }}
-                  className="relative mb-8"
-                >
-                  <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-[0_0_50px_rgba(255,255,255,0.1)] rotate-[-6deg] group-hover:rotate-0 transition-all duration-500">
-                    <Shield size={32} className="text-black" />
-                  </div>
-                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full border-[4px] border-[#0A0A0A] shadow-lg" />
-                </motion.div>
-                
-                <h1 className="text-2xl font-black tracking-tighter text-white/95 text-center italic">Control Center</h1>
-                <p className="text-zinc-500 text-[10px] mt-3 font-bold uppercase tracking-[0.3em] text-center">Protocol: Scrabble-Alpha-1</p>
-              </div>
+function createCompetitionForm(): CompetitionFormState {
+  return {
+    slug: '',
+    name: '',
+    location: '',
+    countryId: '',
+    startDate: '',
+    endDate: '',
+    status: 'upcoming',
+    image: '',
+    description: '',
+    participants: '0',
+    type: '',
+    tags: '',
+    results: '[]',
+  }
+}
 
-              <form onSubmit={handleLogin} className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] ml-1">Terminal Identity</label>
-                  <div className="relative group/input">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-700 group-focus-within/input:text-white transition-colors">
-                      <Command size={16} />
-                    </div>
-                    <input 
-                      type="email" 
-                      placeholder="admin@scrabblepro.afrique"
-                      className="w-full h-14 pl-12 pr-4 rounded-2xl bg-white/[0.02] border border-white/10 text-white text-sm outline-none focus:border-white/30 focus:bg-white/[0.04] transition-all placeholder:text-zinc-800 font-medium"
-                      required
-                    />
-                  </div>
-                </div>
+function parseDelimitedList(value: string) {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
 
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between px-1">
-                    <label className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em]">Neural Key</label>
-                    <span className="text-[9px] font-black text-zinc-800 hover:text-zinc-500 cursor-pointer transition-colors uppercase tracking-[0.2em]">Recovery</span>
-                  </div>
-                  <div className="relative group/input">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-700 group-focus-within/input:text-white transition-colors">
-                      <Zap size={16} />
-                    </div>
-                    <input 
-                      type={showPassword ? 'text' : 'password'} 
-                      placeholder="••••••••••••"
-                      className="w-full h-14 pl-12 pr-12 rounded-2xl bg-white/[0.02] border border-white/10 text-white text-sm outline-none focus:border-white/30 focus:bg-white/[0.04] transition-all placeholder:text-zinc-800 font-mono tracking-widest"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-white transition-colors"
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
+function parseInteger(value: string) {
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) ? parsed : 0
+}
 
-                <div className="flex items-center gap-2 px-1">
-                  <button
-                    type="button"
-                    onClick={() => setKeepLoggedIn(!keepLoggedIn)}
-                    className="flex items-center gap-2 group cursor-pointer"
-                  >
-                    <div className={`w-4 h-4 rounded border transition-all flex items-center justify-center ${keepLoggedIn ? 'bg-emerald-500 border-emerald-500' : 'bg-white/5 border-white/10 group-hover:border-white/20'}`}>
-                      {keepLoggedIn && <Check size={10} className="text-black" />}
-                    </div>
-                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest group-hover:text-zinc-400 transition-colors">Stay linked for 30 days</span>
-                  </button>
-                </div>
+function parseNullableInteger(value: string) {
+  const trimmed = value.trim()
+  return trimmed ? parseInteger(trimmed) : null
+}
 
-                <div className="pt-2">
-                  <button 
-                    type="submit"
-                    disabled={loading}
-                    className="group relative w-full h-14 rounded-2xl bg-white text-black font-black text-xs uppercase tracking-[0.2em] overflow-hidden transition-all active:scale-[0.98] disabled:opacity-50 shadow-[0_20px_40px_rgba(255,255,255,0.05)] hover:shadow-[0_20px_60px_rgba(255,255,255,0.1)]"
-                  >
-                    <div className="absolute inset-0 bg-emerald-500 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
-                    <span className="relative z-10 flex items-center justify-center gap-3 group-hover:text-white transition-colors duration-500">
-                      {loading ? (
-                        <motion.div 
-                          animate={{ rotate: 360 }} 
-                          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                          className="w-4 h-4 border-2 border-current/20 border-t-current rounded-full" 
-                        />
-                      ) : (
-                        <>
-                          Establish Link
-                          <ArrowUpRight size={16} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                        </>
-                      )}
-                    </span>
-                  </button>
-                </div>
-              </form>
+function toSlug(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
 
-              <div className="mt-10 pt-8 border-t border-white/5 flex flex-col items-center gap-4">
-                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/5">
-                  <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Secure Handshake Ready</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Footer Info */}
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="mt-8 flex justify-center items-center gap-8"
-          >
-            <div className="flex items-center gap-2 text-zinc-700 text-[9px] font-bold uppercase tracking-widest">
-              <Shield size={10} />
-              AES-256
-            </div>
-            <div className="flex items-center gap-2 text-zinc-700 text-[9px] font-bold uppercase tracking-widest">
-              <Globe size={10} />
-              Global Auth
-            </div>
-            <div className="flex items-center gap-2 text-zinc-700 text-[9px] font-bold uppercase tracking-widest">
-              <Activity size={10} />
-              Audit Log
-            </div>
-          </motion.div>
-        </motion.div>
-      </div>
-    );
+function toDateTimeLocal(value: string) {
+  if (!value) {
+    return ''
   }
 
-  return (
-    <div className="min-h-screen bg-[#050505] text-zinc-400 font-sans selection:bg-white/10 flex overflow-hidden">
-      <SEO title={`Admin | ${sidebarItems.find(i => i.key === activeSection)?.label}`} />
-      
-      {/* Sidebar - Ultra Minimal */}
-      <aside className={`fixed lg:sticky top-0 h-screen w-[260px] bg-black border-r border-white/5 z-50 transition-all duration-500 lg:translate-x-0 ${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-      }`}>
-        <div className="flex flex-col h-full">
-          {/* Logo Section */}
-          <div className="h-20 flex items-center px-8">
-            <div className="flex items-center gap-3 group cursor-pointer">
-              <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center rotate-[-6deg] group-hover:rotate-0 transition-all duration-500">
-                <span className="text-black font-black text-sm">S</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-bold text-white tracking-tighter leading-none">Scrabble Pro</span>
-                <span className="text-[10px] font-bold text-zinc-600 tracking-widest uppercase mt-1">Control</span>
-              </div>
-            </div>
-          </div>
+  const date = new Date(value)
 
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-8 space-y-1 overflow-y-auto scrollbar-none">
-            {sidebarItems.map(({ icon: Icon, label, key }) => (
-              <button
-                key={key}
-                onClick={() => { setActiveSection(key); setSidebarOpen(false); }}
-                className={`w-full group flex items-center gap-3 px-4 py-2.5 rounded-xl text-[12px] font-bold tracking-tight transition-all duration-300 ${
-                  activeSection === key
-                    ? 'bg-white text-black'
-                    : 'text-zinc-500 hover:text-white hover:bg-white/[0.03]'
-                }`}
-              >
-                <Icon size={16} className={`transition-transform duration-300 group-hover:scale-110 ${activeSection === key ? 'text-black' : 'text-zinc-600 group-hover:text-zinc-400'}`} />
-                {label}
-              </button>
-            ))}
-          </nav>
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
 
-          {/* User Profile */}
-          <div className="p-6">
-            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center gap-3 group cursor-pointer hover:bg-white/[0.05] transition-all duration-300">
-              <div className="w-9 h-9 rounded-xl bg-zinc-800 flex items-center justify-center border border-white/10">
-                <Users size={18} className="text-zinc-500" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[11px] font-bold text-white truncate">Amadou Diallo</div>
-                <div className="text-[9px] text-zinc-600 font-bold uppercase tracking-widest mt-0.5">Principal Admin</div>
-              </div>
-              <LogOut 
-                size={14} 
-                className="text-zinc-700 hover:text-red-400 transition-colors" 
-                onClick={(e) => { e.stopPropagation(); handleLogout(); }}
-              />
-            </div>
-          </div>
-        </div>
-      </aside>
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  const hours = `${date.getHours()}`.padStart(2, '0')
+  const minutes = `${date.getMinutes()}`.padStart(2, '0')
 
-      {/* Main Workspace */}
-      <main className="flex-1 flex flex-col min-w-0 bg-[#080808]">
-        {/* Global Header */}
-        <header className="h-20 flex items-center justify-between px-8 lg:px-12 border-b border-white/5 bg-black/40 backdrop-blur-xl sticky top-0 z-40">
-          <div className="flex items-center gap-6">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-2 text-zinc-500 hover:text-white transition-colors"
-            >
-              <Menu size={22} />
-            </button>
-            <div className="flex items-center gap-3">
-              <div className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-[9px] font-black text-zinc-500 uppercase tracking-widest">v1.4.0</div>
-              <div className="h-4 w-px bg-white/10" />
-              <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-600">
-                Workspace <span className="text-white ml-2">/</span> <span className="text-zinc-400 ml-2">{sidebarItems.find(i => i.key === activeSection)?.label}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-6">
-            <div className="hidden md:flex items-center gap-3 px-4 py-2 rounded-xl bg-white/[0.02] border border-white/5 text-[11px] font-bold text-zinc-600 hover:border-white/10 transition-all cursor-pointer">
-              <Command size={14} />
-              <span>Omnisearch</span>
-              <span className="ml-6 opacity-30 font-mono text-[9px] bg-white/10 px-1.5 py-0.5 rounded">⌘K</span>
-            </div>
-            <div className="h-6 w-px bg-white/10 hidden md:block" />
-            <div className="flex items-center gap-4">
-              <button className="relative p-2 text-zinc-600 hover:text-white transition-colors">
-                <Bell size={20} />
-                <span className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
-              </button>
-              <div className="w-8 h-8 rounded-full border border-white/10 bg-gradient-to-br from-zinc-800 to-black p-0.5">
-                <div className="w-full h-full rounded-full bg-emerald-500/10 flex items-center justify-center text-[10px] font-black text-emerald-500 italic">AD</div>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Workspace Canvas */}
-        <div className="flex-1 overflow-y-auto scrollbar-none">
-          <div className="max-w-[1400px] mx-auto p-8 lg:p-12 w-full">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeSection}
-                initial={{ opacity: 0, scale: 0.995, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.995, y: -10 }}
-                transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              >
-                {activeSection === 'dashboard' && <DashboardView />}
-                {activeSection === 'analytics' && <AnalyticsView />}
-                {activeSection === 'articles' && <ContentView />}
-                {activeSection === 'competitions' && <EventsView />}
-                {activeSection === 'players' && <TalentsView />}
-                {activeSection === 'countries' && <FederationsView />}
-                {activeSection === 'media' && <AssetsView />}
-                {activeSection === 'messages' && <InquiriesView />}
-                {activeSection === 'settings' && <ConfigurationView />}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </div>
-      </main>
-
-      {/* Mobile Drawer Overlay */}
-      <AnimatePresence>
-        {sidebarOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-md z-40 lg:hidden" 
-            onClick={() => setSidebarOpen(false)} 
-          />
-        )}
-      </AnimatePresence>
-    </div>
-  );
+  return `${year}-${month}-${day}T${hours}:${minutes}`
 }
 
-// --- Specialized Dash Components ---
-
-function MetricCard({ label, value, trend, sub, icon: Icon, color = "white" }: any) {
-  return (
-    <div className="relative group p-8 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] hover:border-white/10 transition-all duration-500 overflow-hidden">
-      <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-        <Icon size={64} />
-      </div>
-      <div className="flex flex-col gap-6 relative z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center">
-            <Icon size={16} className="text-zinc-500" />
-          </div>
-          <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">{label}</span>
-        </div>
-        <div>
-          <div className="text-4xl font-bold tracking-tighter text-white mb-2">{value}</div>
-          <div className="flex items-center gap-2">
-            <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${trend.startsWith('+') ? 'bg-emerald-500/10 text-emerald-500' : 'bg-zinc-800 text-zinc-500'}`}>
-              {trend}
-            </span>
-            <span className="text-[10px] font-bold text-zinc-700 uppercase tracking-widest">{sub}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+function serializeResults(results?: Competition['results']) {
+  return JSON.stringify(results ?? [], null, 2)
 }
 
-function DashboardView() {
-  return (
-    <div className="space-y-16">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 border-b border-white/5 pb-12">
-        <div className="space-y-2">
-          <h2 className="text-5xl font-bold text-white tracking-tight italic">Status Report</h2>
-          <p className="text-zinc-500 font-medium text-lg">System wide metrics and real-time activity.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button className="h-12 px-6 rounded-2xl bg-white/[0.03] border border-white/10 text-[11px] font-bold text-white uppercase tracking-widest hover:bg-white/5 transition-all">Download Log</button>
-          <button className="h-12 px-6 rounded-2xl bg-white text-black text-[11px] font-bold uppercase tracking-widest shadow-[0_0_30px_rgba(255,255,255,0.1)] hover:bg-zinc-200 transition-all">Export Summary</button>
-        </div>
-      </div>
+function parseResults(value: string) {
+  const trimmed = value.trim()
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        <MetricCard label="Active Users" value="2.4k" trend="+18.4%" sub="vs last week" icon={Users} />
-        <MetricCard label="Interaction" value="14.2k" trend="+5.2%" sub="clicks / 24h" icon={MousePointer2} />
-        <MetricCard label="Latency" value="24ms" trend="Stable" sub="average response" icon={Zap} />
-        <MetricCard label="Retention" value="64%" trend="-2.1%" sub="churn rate" icon={TrendingUp} />
-      </div>
+  if (!trimmed) {
+    return []
+  }
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-12">
-        <div className="xl:col-span-8 space-y-8">
-          <div className="p-10 rounded-[32px] bg-white/[0.02] border border-white/5 space-y-8 group">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-bold text-white tracking-tight">Traffic Velocity</h3>
-                <p className="text-[11px] font-bold text-zinc-600 uppercase tracking-widest mt-1">Real-time user sessions</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Live Flow</span>
-              </div>
-            </div>
-            <InteractionChart />
-            <div className="flex items-center justify-between pt-4">
-              <div className="flex gap-12">
-                {[
-                  { label: 'Avg Session', val: '4m 32s' },
-                  { label: 'Bounce Rate', val: '31.4%' },
-                  { label: 'Direct', val: '1.2k' }
-                ].map(m => (
-                  <div key={m.label}>
-                    <div className="text-[10px] font-bold text-zinc-700 uppercase tracking-widest mb-1">{m.label}</div>
-                    <div className="text-sm font-bold text-white">{m.val}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-center gap-2 text-zinc-500 hover:text-white cursor-pointer transition-colors">
-                <span className="text-[10px] font-black uppercase tracking-widest">Full Analytics</span>
-                <ChevronRight size={14} />
-              </div>
-            </div>
-          </div>
+  const parsed = JSON.parse(trimmed) as unknown
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="p-8 rounded-[32px] bg-white/[0.02] border border-white/5 space-y-6">
-              <h4 className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                <Activity size={14} className="text-emerald-500" /> Recent Content
-              </h4>
-              <div className="space-y-4">
-                {articles.slice(0, 3).map((a, i) => (
-                  <div key={i} className="flex items-center gap-4 group cursor-pointer">
-                    <div className="w-12 h-12 rounded-2xl bg-zinc-900 overflow-hidden border border-white/5">
-                      <img src={a.image} className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-bold text-white truncate group-hover:text-emerald-400 transition-colors">{a.title}</div>
-                      <div className="text-[9px] font-bold text-zinc-700 uppercase mt-1 tracking-tighter">{a.category} • {a.date}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="p-8 rounded-[32px] bg-white/[0.02] border border-white/5 space-y-6">
-              <h4 className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                <Globe size={14} className="text-emerald-500" /> Active Federations
-              </h4>
-              <div className="space-y-4">
-                {countries.slice(0, 3).map((c, i) => (
-                  <div key={i} className="flex items-center justify-between group cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      <span className="text-xl">{c.flag}</span>
-                      <span className="text-xs font-bold text-zinc-400 group-hover:text-white transition-colors">{c.name}</span>
-                    </div>
-                    <span className="text-[10px] font-mono text-zinc-700">{c.clubs} CLUBS</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+  if (!Array.isArray(parsed)) {
+    throw new Error('Les résultats doivent être un tableau JSON.')
+  }
 
-        <div className="xl:col-span-4 space-y-8">
-          <div className="p-8 rounded-[32px] bg-white/[0.02] border border-white/5 space-y-8">
-            <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest">Platform Core</h3>
-            <div className="space-y-6">
-              {[
-                { label: 'Database Node', val: 98, sub: 'Paris-1' },
-                { label: 'Asset Storage', val: 74, sub: 'Global CDN' },
-                { label: 'Security Layer', val: 100, sub: 'Shield Active' },
-                { label: 'Edge Runtime', val: 88, sub: 'Deployed' }
-              ].map(sys => (
-                <div key={sys.label} className="space-y-3">
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-xs font-bold text-zinc-400">{sys.label}</span>
-                    <span className="text-[10px] font-mono text-zinc-600">{sys.sub}</span>
-                  </div>
-                  <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${sys.val}%` }}
-                      transition={{ duration: 1.5, ease: "circOut" }}
-                      className={`h-full ${sys.val === 100 ? 'bg-emerald-500' : 'bg-white/40'}`} 
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="pt-4 flex items-center justify-between border-t border-white/5">
-              <span className="text-[10px] font-bold text-zinc-700 uppercase">System Integrity</span>
-              <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest italic">Verified</span>
-            </div>
-          </div>
+  return parsed.map((item) => {
+    if (
+      !item ||
+      typeof item !== 'object' ||
+      typeof item.rank !== 'number' ||
+      typeof item.player !== 'string' ||
+      typeof item.country !== 'string' ||
+      typeof item.score !== 'number'
+    ) {
+      throw new Error(
+        'Chaque résultat doit contenir rank, player, country et score avec les bons types.',
+      )
+    }
 
-          <div className="p-8 rounded-[32px] bg-gradient-to-br from-emerald-500 to-emerald-700 text-black space-y-6 shadow-[0_20px_40px_rgba(16,185,129,0.1)]">
-            <div className="w-10 h-10 rounded-xl bg-black/10 flex items-center justify-center">
-              <AlertCircle size={20} />
-            </div>
-            <div>
-              <h3 className="text-xl font-black italic tracking-tighter">Premium Support</h3>
-              <p className="text-xs font-bold mt-2 opacity-80 leading-relaxed">Dedicated engineering support is available 24/7 for Enterprise partners.</p>
-            </div>
-            <button className="w-full h-12 rounded-xl bg-black text-white text-[11px] font-bold uppercase tracking-widest hover:bg-zinc-900 transition-all">Direct Contact</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    return item
+  })
 }
 
-function AnalyticsView() {
-  return (
-    <div className="space-y-16">
-      <div className="space-y-4">
-        <h2 className="text-5xl font-bold text-white tracking-tight italic">Deep Analytics</h2>
-        <p className="text-zinc-500 font-medium text-lg">Granular data exploration and user behavior.</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {[
-          { label: 'Device Distribution', data: [40, 70, 45, 90, 65, 30] },
-          { label: 'Source Referral', data: [80, 50, 95, 40, 60, 85] },
-          { label: 'Engagement Rate', data: [30, 45, 70, 55, 90, 100] }
-        ].map(card => (
-          <div key={card.label} className="p-8 rounded-[32px] bg-white/[0.02] border border-white/5 group">
-            <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-8">{card.label}</h3>
-            <BarChart data={card.data} />
-            <div className="mt-8 flex justify-between items-center">
-              <span className="text-2xl font-bold text-white">74.2%</span>
-              <span className="text-[10px] font-black text-emerald-500">+12%</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="p-12 rounded-[40px] bg-white/[0.02] border border-white/5 space-y-12">
-        <div className="flex items-center justify-between">
-          <h3 className="text-2xl font-bold text-white tracking-tight italic">World Activity Map</h3>
-          <div className="flex gap-4">
-            {['Weekly', 'Monthly', 'Quarterly'].map(t => (
-              <button key={t} className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${t === 'Monthly' ? 'bg-white text-black' : 'text-zinc-600 hover:text-white'}`}>{t}</button>
-            ))}
-          </div>
-        </div>
-        <div className="aspect-[21/9] bg-zinc-900/50 rounded-3xl border border-white/5 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-4 opacity-20">
-            <Globe size={48} />
-            <span className="text-[11px] font-bold uppercase tracking-[0.3em]">Geospatial Engine Offline</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+function countryToForm(country: Country): CountryFormState {
+  return {
+    slug: country.slug,
+    name: country.name,
+    code: country.code,
+    flag: country.flag,
+    image: country.image,
+    federation: country.federation,
+    clubs: country.clubs.toString(),
+    players: country.players.toString(),
+    description: country.description,
+    tags: country.tags.join(', '),
+  }
 }
 
-// ... rest of the file (UnifiedTable, ContentView, etc.) exactly as before
-function UnifiedTable({ title, count, headers, rows }: any) {
-  return (
-    <div className="space-y-12">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
-        <div>
-          <h2 className="text-5xl font-bold text-white tracking-tight italic">{title}</h2>
-          <p className="text-zinc-500 font-medium text-lg mt-2">Managing <span className="text-white">{count}</span> global entries.</p>
+function playerToForm(player: Player, countries: Country[]): PlayerFormState {
+  return {
+    slug: player.slug,
+    name: player.name,
+    countryId: countries.find((country) => country.name === player.country)?.id ?? '',
+    image: player.image,
+    ranking: player.ranking.toString(),
+    rating: player.rating.toString(),
+    titles: player.titles.join(', '),
+    tags: player.tags.join(', '),
+    bio: player.bio,
+    club: player.club,
+    featured: player.featured,
+  }
+}
+
+function articleToForm(article: Article, countries: Country[]): ArticleFormState {
+  return {
+    slug: article.slug,
+    title: article.title,
+    excerpt: article.excerpt,
+    content: article.content,
+    image: article.image,
+    category: article.category,
+    tags: article.tags.join(', '),
+    countryId: countries.find((country) => country.name === article.country)?.id ?? '',
+    author: article.author,
+    authorImage: article.authorImage,
+    publishedAt: toDateTimeLocal(article.date),
+    readTime: article.readTime,
+    featured: article.featured,
+  }
+}
+
+function competitionToForm(competition: Competition, countries: Country[]): CompetitionFormState {
+  return {
+    slug: competition.slug,
+    name: competition.name,
+    location: competition.location,
+    countryId: countries.find((country) => country.name === competition.country)?.id ?? '',
+    startDate: toDateTimeLocal(competition.startDate),
+    endDate: toDateTimeLocal(competition.endDate),
+    status: competition.status,
+    image: competition.image,
+    description: competition.description,
+    participants: competition.participants.toString(),
+    type: competition.type,
+    tags: competition.tags.join(', '),
+    results: serializeResults(competition.results),
+  }
+}
+
+export default function AdminPage() {
+  const [session, setSession] = useState<Session | null>(null)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard')
+  const [submitting, setSubmitting] = useState(false)
+  const [loadingData, setLoadingData] = useState(false)
+  const [savingTab, setSavingTab] = useState<AdminTab | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [articles, setArticles] = useState<Article[]>([])
+  const [competitions, setCompetitions] = useState<Competition[]>([])
+  const [players, setPlayers] = useState<Player[]>([])
+  const [countries, setCountries] = useState<Country[]>([])
+  const [messages, setMessages] = useState<Message[]>([])
+  const [messageTagDrafts, setMessageTagDrafts] = useState<Record<string, string>>({})
+
+  const [countryEditingId, setCountryEditingId] = useState<string | null>(null)
+  const [countryForm, setCountryForm] = useState<CountryFormState>(createCountryForm())
+  const [playerEditingId, setPlayerEditingId] = useState<string | null>(null)
+  const [playerForm, setPlayerForm] = useState<PlayerFormState>(createPlayerForm())
+  const [articleEditingId, setArticleEditingId] = useState<string | null>(null)
+  const [articleForm, setArticleForm] = useState<ArticleFormState>(createArticleForm())
+  const [competitionEditingId, setCompetitionEditingId] = useState<string | null>(null)
+  const [competitionForm, setCompetitionForm] = useState<CompetitionFormState>(createCompetitionForm())
+
+  const isConfigured = isSupabaseConfigured && Boolean(supabase)
+  const isAdmin = hasAdminAccess(session?.user)
+
+  const refreshData = useCallback(async () => {
+    if (!supabase || !session || !isAdmin) return
+
+    setLoadingData(true)
+    setError(null)
+
+    try {
+      const [nextArticles, nextCompetitions, nextPlayers, nextCountries, nextMessages] = await Promise.all([
+        loadArticles(),
+        loadCompetitions(),
+        loadPlayers(),
+        loadCountries(),
+        messageService.getAll().catch(() => []),
+      ])
+
+      setArticles(nextArticles)
+      setCompetitions(nextCompetitions)
+      setPlayers(nextPlayers)
+      setCountries(nextCountries)
+      setMessages(nextMessages)
+      setMessageTagDrafts(
+        Object.fromEntries(nextMessages.map((message) => [message.id, message.tag || 'general'])),
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Le chargement de l'administration a échoué.")
+    } finally {
+      setLoadingData(false)
+    }
+  }, [isAdmin, session])
+
+  useEffect(() => {
+    if (!supabase) return
+
+    let mounted = true
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (mounted) {
+        setSession(data.session)
+      }
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (mounted) {
+        setSession(nextSession)
+      }
+    })
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (session && isAdmin) {
+      void refreshData()
+    }
+  }, [refreshData, session, isAdmin])
+
+  function resetFeedback() {
+    setError(null)
+    setNotice(null)
+  }
+
+  function startNewCountry() {
+    resetFeedback()
+    setCountryEditingId(null)
+    setCountryForm(createCountryForm())
+  }
+
+  function startEditCountry(country: Country) {
+    resetFeedback()
+    setCountryEditingId(country.id)
+    setCountryForm(countryToForm(country))
+  }
+
+  function startNewPlayer() {
+    resetFeedback()
+    setPlayerEditingId(null)
+    setPlayerForm(createPlayerForm())
+  }
+
+  function startEditPlayer(player: Player) {
+    resetFeedback()
+    setPlayerEditingId(player.id)
+    setPlayerForm(playerToForm(player, countries))
+  }
+
+  function startNewArticle() {
+    resetFeedback()
+    setArticleEditingId(null)
+    setArticleForm(createArticleForm())
+  }
+
+  function startEditArticle(article: Article) {
+    resetFeedback()
+    setArticleEditingId(article.id)
+    setArticleForm(articleToForm(article, countries))
+  }
+
+  function startNewCompetition() {
+    resetFeedback()
+    setCompetitionEditingId(null)
+    setCompetitionForm(createCompetitionForm())
+  }
+
+  function startEditCompetition(competition: Competition) {
+    resetFeedback()
+    setCompetitionEditingId(competition.id)
+    setCompetitionForm(competitionToForm(competition, countries))
+  }
+
+  async function handleLogin(event: FormEvent) {
+    event.preventDefault()
+    if (!supabase) return
+
+    setSubmitting(true)
+    setError(null)
+    setNotice(null)
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (signInError) {
+      setError(signInError.message)
+    }
+
+    setSubmitting(false)
+  }
+
+  async function handleLogout() {
+    if (!supabase) return
+
+    await supabase.auth.signOut()
+    setSession(null)
+    setArticles([])
+    setCompetitions([])
+    setPlayers([])
+    setCountries([])
+    setMessages([])
+    setMessageTagDrafts({})
+    setNotice(null)
+    setError(null)
+  }
+
+  async function handleSaveCountry(event: FormEvent) {
+    event.preventDefault()
+    setSavingTab('countries')
+    resetFeedback()
+
+    try {
+      const payload = {
+        slug: countryForm.slug.trim(),
+        name: countryForm.name.trim(),
+        code: countryForm.code.trim().toUpperCase(),
+        flag: countryForm.flag.trim(),
+        image: countryForm.image.trim(),
+        federation: countryForm.federation.trim(),
+        clubs: parseInteger(countryForm.clubs),
+        players: parseInteger(countryForm.players),
+        description: countryForm.description.trim(),
+        tags: parseDelimitedList(countryForm.tags),
+      }
+
+      if (countryEditingId) {
+        await countryService.update(countryEditingId, payload)
+      } else {
+        await countryService.create(payload)
+      }
+
+      await refreshData()
+      setNotice(countryEditingId ? 'Pays mis à jour.' : 'Pays créé.')
+      if (!countryEditingId) {
+        startNewCountry()
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible d’enregistrer le pays.')
+    } finally {
+      setSavingTab(null)
+    }
+  }
+
+  async function handleSavePlayer(event: FormEvent) {
+    event.preventDefault()
+    setSavingTab('players')
+    resetFeedback()
+
+    try {
+      const payload = {
+        slug: playerForm.slug.trim(),
+        name: playerForm.name.trim(),
+        countryId: parseNullableInteger(playerForm.countryId),
+        image: playerForm.image.trim(),
+        ranking: parseInteger(playerForm.ranking),
+        rating: parseInteger(playerForm.rating),
+        titles: parseDelimitedList(playerForm.titles),
+        tags: parseDelimitedList(playerForm.tags),
+        bio: playerForm.bio.trim(),
+        club: playerForm.club.trim(),
+        featured: playerForm.featured,
+      }
+
+      if (playerEditingId) {
+        await playerService.update(playerEditingId, payload)
+      } else {
+        await playerService.create(payload)
+      }
+
+      await refreshData()
+      setNotice(playerEditingId ? 'Joueur mis à jour.' : 'Joueur créé.')
+      if (!playerEditingId) {
+        startNewPlayer()
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible d’enregistrer le joueur.')
+    } finally {
+      setSavingTab(null)
+    }
+  }
+
+  async function handleSaveArticle(event: FormEvent) {
+    event.preventDefault()
+    setSavingTab('articles')
+    resetFeedback()
+
+    try {
+      const payload = {
+        slug: articleForm.slug.trim(),
+        title: articleForm.title.trim(),
+        excerpt: articleForm.excerpt.trim(),
+        content: articleForm.content.trim(),
+        image: articleForm.image.trim(),
+        category: articleForm.category.trim(),
+        tags: parseDelimitedList(articleForm.tags),
+        countryId: parseNullableInteger(articleForm.countryId),
+        author: articleForm.author.trim(),
+        authorImage: articleForm.authorImage.trim(),
+        publishedAt: articleForm.publishedAt ? new Date(articleForm.publishedAt).toISOString() : new Date().toISOString(),
+        readTime: articleForm.readTime.trim(),
+        featured: articleForm.featured,
+      }
+
+      if (articleEditingId) {
+        await articleService.update(articleEditingId, payload)
+      } else {
+        await articleService.create(payload)
+      }
+
+      await refreshData()
+      setNotice(articleEditingId ? 'Article mis à jour.' : 'Article créé.')
+      if (!articleEditingId) {
+        startNewArticle()
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible d’enregistrer l’article.')
+    } finally {
+      setSavingTab(null)
+    }
+  }
+
+  async function handleSaveCompetition(event: FormEvent) {
+    event.preventDefault()
+    setSavingTab('competitions')
+    resetFeedback()
+
+    try {
+      const payload = {
+        slug: competitionForm.slug.trim(),
+        name: competitionForm.name.trim(),
+        location: competitionForm.location.trim(),
+        countryId: parseNullableInteger(competitionForm.countryId),
+        startDate: new Date(competitionForm.startDate).toISOString(),
+        endDate: new Date(competitionForm.endDate).toISOString(),
+        status: competitionForm.status,
+        image: competitionForm.image.trim(),
+        description: competitionForm.description.trim(),
+        participants: parseInteger(competitionForm.participants),
+        type: competitionForm.type.trim(),
+        tags: parseDelimitedList(competitionForm.tags),
+        results: parseResults(competitionForm.results),
+      }
+
+      if (competitionEditingId) {
+        await competitionService.update(competitionEditingId, payload)
+      } else {
+        await competitionService.create(payload)
+      }
+
+      await refreshData()
+      setNotice(competitionEditingId ? 'Compétition mise à jour.' : 'Compétition créée.')
+      if (!competitionEditingId) {
+        startNewCompetition()
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible d’enregistrer la compétition.')
+    } finally {
+      setSavingTab(null)
+    }
+  }
+
+  async function handleDeleteCountry(id: string) {
+    if (!window.confirm('Supprimer ce pays ?')) return
+
+    setSavingTab('countries')
+    resetFeedback()
+
+    try {
+      await countryService.delete(id)
+      await refreshData()
+      if (countryEditingId === id) {
+        startNewCountry()
+      }
+      setNotice('Pays supprimé.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de supprimer ce pays.')
+    } finally {
+      setSavingTab(null)
+    }
+  }
+
+  async function handleDeletePlayer(id: string) {
+    if (!window.confirm('Supprimer ce joueur ?')) return
+
+    setSavingTab('players')
+    resetFeedback()
+
+    try {
+      await playerService.delete(id)
+      await refreshData()
+      if (playerEditingId === id) {
+        startNewPlayer()
+      }
+      setNotice('Joueur supprimé.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de supprimer ce joueur.')
+    } finally {
+      setSavingTab(null)
+    }
+  }
+
+  async function handleDeleteArticle(id: string) {
+    if (!window.confirm('Supprimer cet article ?')) return
+
+    setSavingTab('articles')
+    resetFeedback()
+
+    try {
+      await articleService.delete(id)
+      await refreshData()
+      if (articleEditingId === id) {
+        startNewArticle()
+      }
+      setNotice('Article supprimé.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de supprimer cet article.')
+    } finally {
+      setSavingTab(null)
+    }
+  }
+
+  async function handleDeleteCompetition(id: string) {
+    if (!window.confirm('Supprimer cette compétition ?')) return
+
+    setSavingTab('competitions')
+    resetFeedback()
+
+    try {
+      await competitionService.delete(id)
+      await refreshData()
+      if (competitionEditingId === id) {
+        startNewCompetition()
+      }
+      setNotice('Compétition supprimée.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de supprimer cette compétition.')
+    } finally {
+      setSavingTab(null)
+    }
+  }
+
+  async function handleToggleMessageRead(message: Message) {
+    setSavingTab('messages')
+    resetFeedback()
+
+    try {
+      await messageService.update(message.id, { read: !message.read })
+      await refreshData()
+      setNotice(message.read ? 'Message marqué non lu.' : 'Message marqué lu.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de mettre à jour ce message.')
+    } finally {
+      setSavingTab(null)
+    }
+  }
+
+  async function handleSaveMessageTag(messageId: string) {
+    setSavingTab('messages')
+    resetFeedback()
+
+    try {
+      await messageService.update(messageId, {
+        tag: messageTagDrafts[messageId]?.trim() || 'general',
+      })
+      await refreshData()
+      setNotice('Tag du message mis à jour.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de mettre à jour le tag.')
+    } finally {
+      setSavingTab(null)
+    }
+  }
+
+  async function handleDeleteMessage(messageId: string) {
+    if (!window.confirm('Supprimer ce message ?')) return
+
+    setSavingTab('messages')
+    resetFeedback()
+
+    try {
+      await messageService.delete(messageId)
+      await refreshData()
+      setNotice('Message supprimé.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de supprimer ce message.')
+    } finally {
+      setSavingTab(null)
+    }
+  }
+
+  if (!isConfigured) {
+    return (
+      <div className="min-h-screen bg-bg-primary px-6 py-24 text-text-primary">
+        <SEO title="Admin indisponible | Scrabble Pro Afrique" />
+        <div className="mx-auto max-w-2xl rounded-[2rem] border border-white/10 bg-white/[0.03] p-10">
+          <div className="mb-6 flex items-center gap-4">
+            <ShieldAlert className="text-gold" size={28} />
+            <h1 className="text-2xl font-bold">Administration indisponible</h1>
+          </div>
+          <p className="leading-relaxed text-text-secondary">
+            Les variables Supabase ne sont pas configurées. Ajoutez `VITE_SUPABASE_URL` et
+            `VITE_SUPABASE_PUBLISHABLE_KEY` puis redéployez l&apos;application.
+          </p>
         </div>
-        <div className="flex gap-3">
-          <button className="h-12 w-12 flex items-center justify-center rounded-2xl bg-white/[0.03] border border-white/10 text-zinc-500 hover:text-white transition-all"><Filter size={18} /></button>
-          <button className="h-12 px-6 flex items-center gap-3 rounded-2xl bg-white text-black text-[11px] font-bold uppercase tracking-widest shadow-[0_0_30px_rgba(255,255,255,0.1)] hover:bg-zinc-200 transition-all">
-            <Plus size={16} /> New Entry
+      </div>
+    )
+  }
+
+  if (!session) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#050505] px-6 py-24 text-white">
+        <SEO title="Connexion admin | Scrabble Pro Afrique" />
+        <form
+          onSubmit={handleLogin}
+          className="w-full max-w-md rounded-[2rem] border border-white/10 bg-white/[0.03] p-8 shadow-2xl"
+        >
+          <div className="mb-8">
+            <p className="mb-3 text-[11px] font-black uppercase tracking-[0.3em] text-emerald-light">Admin</p>
+            <h1 className="text-3xl font-bold tracking-tight">Connexion sécurisée</h1>
+            <p className="mt-3 text-sm text-zinc-400">
+              Utilisez un compte Supabase autorisé avec `app_metadata.role = admin` ou une adresse
+              `@scrabblepro.africa`.
+            </p>
+          </div>
+
+          <div className="space-y-5">
+            <InputField
+              label="Email"
+              value={email}
+              onChange={setEmail}
+              type="email"
+              placeholder="admin@scrabblepro.africa"
+              required
+            />
+            <InputField
+              label="Mot de passe"
+              value={password}
+              onChange={setPassword}
+              type="password"
+              placeholder="Votre mot de passe"
+              required
+            />
+          </div>
+
+          {error ? <Alert tone="error">{error}</Alert> : null}
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="mt-6 flex w-full items-center justify-center gap-3 rounded-2xl bg-white px-5 py-4 text-xs font-black uppercase tracking-[0.2em] text-black transition-all hover:bg-zinc-200 disabled:opacity-60"
+          >
+            {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
+            {submitting ? 'Connexion...' : 'Se connecter'}
+          </button>
+        </form>
+      </div>
+    )
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-bg-primary px-6 py-24 text-text-primary">
+        <SEO title="Accès refusé | Scrabble Pro Afrique" />
+        <div className="mx-auto max-w-2xl rounded-[2rem] border border-white/10 bg-white/[0.03] p-10">
+          <div className="mb-6 flex items-center gap-4">
+            <ShieldAlert className="text-red-400" size={28} />
+            <h1 className="text-2xl font-bold">Accès refusé</h1>
+          </div>
+          <p className="leading-relaxed text-text-secondary">
+            Le compte connecté n&apos;a pas les autorisations d&apos;administration nécessaires.
+          </p>
+          <button
+            onClick={() => void handleLogout()}
+            className="mt-8 rounded-2xl border border-white/10 bg-white px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-black"
+          >
+            Se déconnecter
           </button>
         </div>
       </div>
+    )
+  }
 
-      <div className="rounded-[32px] bg-white/[0.02] border border-white/5 overflow-hidden">
-        <div className="overflow-x-auto scrollbar-none">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-white/5">
-                {headers.map((h: string) => (
-                  <th key={h} className="px-10 py-6 text-[10px] font-bold text-zinc-600 uppercase tracking-widest">{h}</th>
+  return (
+    <div className="min-h-screen bg-bg-primary text-text-primary">
+      <SEO title="Admin | Scrabble Pro Afrique" />
+
+      <header className="sticky top-0 z-20 border-b border-white/5 bg-[#0b0d11]/95 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-6 py-5">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.3em] text-emerald-light">
+              Admin Console
+            </p>
+            <h1 className="mt-2 text-2xl font-bold tracking-tight">Scrabble Pro Afrique</h1>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => void refreshData()}
+              disabled={loadingData}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-xs font-bold uppercase tracking-[0.2em] text-white"
+            >
+              <RefreshCcw size={14} className={loadingData ? 'animate-spin' : ''} />
+              Actualiser
+            </button>
+            <button
+              onClick={() => void handleLogout()}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white px-4 py-3 text-xs font-black uppercase tracking-[0.2em] text-black"
+            >
+              <LogOut size={14} />
+              Déconnexion
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-7xl px-6 py-10">
+        <div className="mb-8 flex flex-wrap items-center gap-3">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`rounded-full px-4 py-2 text-xs font-black uppercase tracking-[0.2em] transition-all ${
+                activeTab === tab.key
+                  ? 'bg-white text-black'
+                  : 'border border-white/10 bg-white/[0.03] text-text-secondary hover:text-white'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {error ? <Alert tone="error">{error}</Alert> : null}
+        {notice ? <Alert tone="success">{notice}</Alert> : null}
+
+        {activeTab === 'dashboard' ? (
+          <div className="space-y-8">
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
+              <StatCard icon={FileText} label="Articles" value={articles.length.toString()} />
+              <StatCard icon={Trophy} label="Compétitions" value={competitions.length.toString()} />
+              <StatCard icon={Users} label="Joueurs" value={players.length.toString()} />
+              <StatCard icon={Globe} label="Pays" value={countries.length.toString()} />
+              <StatCard icon={Mail} label="Messages" value={messages.length.toString()} />
+            </div>
+
+            <div className="grid gap-8 lg:grid-cols-2">
+              <Panel title="Derniers articles">
+                {articles.slice(0, 5).map((article) => (
+                  <SimpleRow
+                    key={article.id}
+                    title={article.title}
+                    subtitle={`${article.category} · ${new Date(article.date).toLocaleDateString('fr-FR')}`}
+                  />
                 ))}
-                <th className="px-10 py-6 text-right text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {rows.map((row: any, i: number) => (
-                <tr key={i} className="group hover:bg-white/[0.01] transition-colors">
-                  {row.map((cell: any, j: number) => (
-                    <td key={j} className="px-10 py-8 text-sm font-medium text-zinc-400 group-hover:text-zinc-200 transition-colors">{cell}</td>
-                  ))}
-                  <td className="px-10 py-8 text-right">
-                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="p-2 rounded-xl hover:bg-white/5 text-zinc-600 hover:text-white transition-all"><Edit size={16} /></button>
-                      <button className="p-2 rounded-xl hover:bg-red-500/10 text-zinc-600 hover:text-red-400 transition-all"><Trash2 size={16} /></button>
-                      <button className="p-2 rounded-xl hover:bg-white/5 text-zinc-600 hover:text-white transition-all"><MoreHorizontal size={16} /></button>
+              </Panel>
+
+              <Panel title="Derniers messages">
+                {messages.length > 0 ? (
+                  messages.slice(0, 5).map((message) => (
+                    <SimpleRow
+                      key={message.id}
+                      title={message.subject}
+                      subtitle={`${message.name} · ${message.email}`}
+                    />
+                  ))
+                ) : (
+                  <EmptyState text="Aucun message disponible ou accès RLS non accordé." />
+                )}
+              </Panel>
+            </div>
+          </div>
+        ) : null}
+
+        {activeTab === 'countries' ? (
+          <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+            <Panel
+              title="Pays enregistrés"
+              action={
+                <ActionButton onClick={startNewCountry}>
+                  <Plus size={14} />
+                  Nouveau
+                </ActionButton>
+              }
+            >
+              {countries.length > 0 ? (
+                countries.map((country) => (
+                  <RecordRow
+                    key={country.id}
+                    title={country.name}
+                    subtitle={`${country.code} · ${country.federation}`}
+                    meta={`${country.clubs} clubs · ${country.players} joueurs`}
+                    onEdit={() => startEditCountry(country)}
+                    onDelete={() => void handleDeleteCountry(country.id)}
+                    busy={savingTab === 'countries'}
+                  />
+                ))
+              ) : (
+                <EmptyState text="Aucun pays disponible." />
+              )}
+            </Panel>
+
+            <Panel title={countryEditingId ? 'Modifier le pays' : 'Créer un pays'}>
+              <form onSubmit={handleSaveCountry} className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <InputField label="Nom" value={countryForm.name} onChange={(value) => setCountryForm((current) => ({ ...current, name: value }))} required />
+                  <InputWithAction
+                    label="Slug"
+                    value={countryForm.slug}
+                    onChange={(value) => setCountryForm((current) => ({ ...current, slug: value }))}
+                    buttonLabel="Générer"
+                    onAction={() =>
+                      setCountryForm((current) => ({ ...current, slug: toSlug(current.name || current.code) }))
+                    }
+                    required
+                  />
+                  <InputField label="Code" value={countryForm.code} onChange={(value) => setCountryForm((current) => ({ ...current, code: value }))} required />
+                  <InputField label="Drapeau" value={countryForm.flag} onChange={(value) => setCountryForm((current) => ({ ...current, flag: value }))} required />
+                  <InputField label="Image" value={countryForm.image} onChange={(value) => setCountryForm((current) => ({ ...current, image: value }))} required />
+                  <InputField label="Fédération" value={countryForm.federation} onChange={(value) => setCountryForm((current) => ({ ...current, federation: value }))} required />
+                  <InputField label="Clubs" value={countryForm.clubs} onChange={(value) => setCountryForm((current) => ({ ...current, clubs: value }))} type="number" required />
+                  <InputField label="Joueurs" value={countryForm.players} onChange={(value) => setCountryForm((current) => ({ ...current, players: value }))} type="number" required />
+                </div>
+                <TextAreaField label="Description" value={countryForm.description} onChange={(value) => setCountryForm((current) => ({ ...current, description: value }))} rows={5} required />
+                <InputField label="Tags (séparés par des virgules)" value={countryForm.tags} onChange={(value) => setCountryForm((current) => ({ ...current, tags: value }))} />
+                <FormActions
+                  onReset={startNewCountry}
+                  saving={savingTab === 'countries'}
+                  submitLabel={countryEditingId ? 'Mettre à jour' : 'Créer'}
+                />
+              </form>
+            </Panel>
+          </div>
+        ) : null}
+
+        {activeTab === 'players' ? (
+          <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+            <Panel
+              title="Joueurs"
+              action={
+                <ActionButton onClick={startNewPlayer}>
+                  <Plus size={14} />
+                  Nouveau
+                </ActionButton>
+              }
+            >
+              {players.length > 0 ? (
+                players.map((player) => (
+                  <RecordRow
+                    key={player.id}
+                    title={player.name}
+                    subtitle={`${player.country || 'Sans pays'} · #${player.ranking}`}
+                    meta={`Rating ${player.rating} · ${player.club}`}
+                    onEdit={() => startEditPlayer(player)}
+                    onDelete={() => void handleDeletePlayer(player.id)}
+                    busy={savingTab === 'players'}
+                  />
+                ))
+              ) : (
+                <EmptyState text="Aucun joueur disponible." />
+              )}
+            </Panel>
+
+            <Panel title={playerEditingId ? 'Modifier le joueur' : 'Créer un joueur'}>
+              <form onSubmit={handleSavePlayer} className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <InputField label="Nom" value={playerForm.name} onChange={(value) => setPlayerForm((current) => ({ ...current, name: value }))} required />
+                  <InputWithAction
+                    label="Slug"
+                    value={playerForm.slug}
+                    onChange={(value) => setPlayerForm((current) => ({ ...current, slug: value }))}
+                    buttonLabel="Générer"
+                    onAction={() => setPlayerForm((current) => ({ ...current, slug: toSlug(current.name) }))}
+                    required
+                  />
+                  <SelectField
+                    label="Pays"
+                    value={playerForm.countryId}
+                    onChange={(value) => setPlayerForm((current) => ({ ...current, countryId: value }))}
+                    options={countries.map((country) => ({ value: country.id, label: country.name }))}
+                  />
+                  <InputField label="Image" value={playerForm.image} onChange={(value) => setPlayerForm((current) => ({ ...current, image: value }))} required />
+                  <InputField label="Classement" value={playerForm.ranking} onChange={(value) => setPlayerForm((current) => ({ ...current, ranking: value }))} type="number" required />
+                  <InputField label="Rating" value={playerForm.rating} onChange={(value) => setPlayerForm((current) => ({ ...current, rating: value }))} type="number" required />
+                  <InputField label="Club" value={playerForm.club} onChange={(value) => setPlayerForm((current) => ({ ...current, club: value }))} required />
+                  <InputField label="Titres (virgules)" value={playerForm.titles} onChange={(value) => setPlayerForm((current) => ({ ...current, titles: value }))} />
+                  <InputField label="Tags (virgules)" value={playerForm.tags} onChange={(value) => setPlayerForm((current) => ({ ...current, tags: value }))} />
+                </div>
+                <TextAreaField label="Biographie" value={playerForm.bio} onChange={(value) => setPlayerForm((current) => ({ ...current, bio: value }))} rows={6} required />
+                <CheckboxField label="Mettre en avant ce joueur" checked={playerForm.featured} onChange={(value) => setPlayerForm((current) => ({ ...current, featured: value }))} />
+                <FormActions
+                  onReset={startNewPlayer}
+                  saving={savingTab === 'players'}
+                  submitLabel={playerEditingId ? 'Mettre à jour' : 'Créer'}
+                />
+              </form>
+            </Panel>
+          </div>
+        ) : null}
+
+        {activeTab === 'articles' ? (
+          <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+            <Panel
+              title="Articles"
+              action={
+                <ActionButton onClick={startNewArticle}>
+                  <Plus size={14} />
+                  Nouveau
+                </ActionButton>
+              }
+            >
+              {articles.length > 0 ? (
+                articles.map((article) => (
+                  <RecordRow
+                    key={article.id}
+                    title={article.title}
+                    subtitle={`${article.category} · ${article.country}`}
+                    meta={`${article.author} · ${new Date(article.date).toLocaleDateString('fr-FR')}`}
+                    onEdit={() => startEditArticle(article)}
+                    onDelete={() => void handleDeleteArticle(article.id)}
+                    busy={savingTab === 'articles'}
+                  />
+                ))
+              ) : (
+                <EmptyState text="Aucun article disponible." />
+              )}
+            </Panel>
+
+            <Panel title={articleEditingId ? 'Modifier l’article' : 'Créer un article'}>
+              <form onSubmit={handleSaveArticle} className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <InputField label="Titre" value={articleForm.title} onChange={(value) => setArticleForm((current) => ({ ...current, title: value }))} required />
+                  <InputWithAction
+                    label="Slug"
+                    value={articleForm.slug}
+                    onChange={(value) => setArticleForm((current) => ({ ...current, slug: value }))}
+                    buttonLabel="Générer"
+                    onAction={() => setArticleForm((current) => ({ ...current, slug: toSlug(current.title) }))}
+                    required
+                  />
+                  <InputField label="Catégorie" value={articleForm.category} onChange={(value) => setArticleForm((current) => ({ ...current, category: value }))} required />
+                  <SelectField
+                    label="Pays"
+                    value={articleForm.countryId}
+                    onChange={(value) => setArticleForm((current) => ({ ...current, countryId: value }))}
+                    options={countries.map((country) => ({ value: country.id, label: country.name }))}
+                  />
+                  <InputField label="Image" value={articleForm.image} onChange={(value) => setArticleForm((current) => ({ ...current, image: value }))} required />
+                  <InputField label="Auteur" value={articleForm.author} onChange={(value) => setArticleForm((current) => ({ ...current, author: value }))} required />
+                  <InputField label="Image auteur" value={articleForm.authorImage} onChange={(value) => setArticleForm((current) => ({ ...current, authorImage: value }))} required />
+                  <InputField label="Publication" value={articleForm.publishedAt} onChange={(value) => setArticleForm((current) => ({ ...current, publishedAt: value }))} type="datetime-local" required />
+                  <InputField label="Temps de lecture" value={articleForm.readTime} onChange={(value) => setArticleForm((current) => ({ ...current, readTime: value }))} placeholder="5 min" required />
+                  <InputField label="Tags (virgules)" value={articleForm.tags} onChange={(value) => setArticleForm((current) => ({ ...current, tags: value }))} />
+                </div>
+                <TextAreaField label="Extrait" value={articleForm.excerpt} onChange={(value) => setArticleForm((current) => ({ ...current, excerpt: value }))} rows={4} required />
+                <TextAreaField label="Contenu" value={articleForm.content} onChange={(value) => setArticleForm((current) => ({ ...current, content: value }))} rows={10} required />
+                <CheckboxField label="Mettre en avant cet article" checked={articleForm.featured} onChange={(value) => setArticleForm((current) => ({ ...current, featured: value }))} />
+                <FormActions
+                  onReset={startNewArticle}
+                  saving={savingTab === 'articles'}
+                  submitLabel={articleEditingId ? 'Mettre à jour' : 'Créer'}
+                />
+              </form>
+            </Panel>
+          </div>
+        ) : null}
+
+        {activeTab === 'competitions' ? (
+          <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+            <Panel
+              title="Compétitions"
+              action={
+                <ActionButton onClick={startNewCompetition}>
+                  <Plus size={14} />
+                  Nouveau
+                </ActionButton>
+              }
+            >
+              {competitions.length > 0 ? (
+                competitions.map((competition) => (
+                  <RecordRow
+                    key={competition.id}
+                    title={competition.name}
+                    subtitle={`${competition.location} · ${competition.status}`}
+                    meta={`${competition.participants} participants`}
+                    onEdit={() => startEditCompetition(competition)}
+                    onDelete={() => void handleDeleteCompetition(competition.id)}
+                    busy={savingTab === 'competitions'}
+                  />
+                ))
+              ) : (
+                <EmptyState text="Aucune compétition disponible." />
+              )}
+            </Panel>
+
+            <Panel title={competitionEditingId ? 'Modifier la compétition' : 'Créer une compétition'}>
+              <form onSubmit={handleSaveCompetition} className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <InputField label="Nom" value={competitionForm.name} onChange={(value) => setCompetitionForm((current) => ({ ...current, name: value }))} required />
+                  <InputWithAction
+                    label="Slug"
+                    value={competitionForm.slug}
+                    onChange={(value) => setCompetitionForm((current) => ({ ...current, slug: value }))}
+                    buttonLabel="Générer"
+                    onAction={() =>
+                      setCompetitionForm((current) => ({ ...current, slug: toSlug(current.name) }))
+                    }
+                    required
+                  />
+                  <InputField label="Lieu" value={competitionForm.location} onChange={(value) => setCompetitionForm((current) => ({ ...current, location: value }))} required />
+                  <SelectField
+                    label="Pays"
+                    value={competitionForm.countryId}
+                    onChange={(value) => setCompetitionForm((current) => ({ ...current, countryId: value }))}
+                    options={countries.map((country) => ({ value: country.id, label: country.name }))}
+                  />
+                  <InputField label="Début" value={competitionForm.startDate} onChange={(value) => setCompetitionForm((current) => ({ ...current, startDate: value }))} type="datetime-local" required />
+                  <InputField label="Fin" value={competitionForm.endDate} onChange={(value) => setCompetitionForm((current) => ({ ...current, endDate: value }))} type="datetime-local" required />
+                  <SelectField
+                    label="Statut"
+                    value={competitionForm.status}
+                    onChange={(value) =>
+                      setCompetitionForm((current) => ({
+                        ...current,
+                        status: value as Competition['status'],
+                      }))
+                    }
+                    options={[
+                      { value: 'upcoming', label: 'À venir' },
+                      { value: 'ongoing', label: 'En cours' },
+                      { value: 'completed', label: 'Terminée' },
+                    ]}
+                    required
+                  />
+                  <InputField label="Participants" value={competitionForm.participants} onChange={(value) => setCompetitionForm((current) => ({ ...current, participants: value }))} type="number" required />
+                  <InputField label="Type" value={competitionForm.type} onChange={(value) => setCompetitionForm((current) => ({ ...current, type: value }))} required />
+                  <InputField label="Image" value={competitionForm.image} onChange={(value) => setCompetitionForm((current) => ({ ...current, image: value }))} required />
+                  <InputField label="Tags (virgules)" value={competitionForm.tags} onChange={(value) => setCompetitionForm((current) => ({ ...current, tags: value }))} />
+                </div>
+                <TextAreaField label="Description" value={competitionForm.description} onChange={(value) => setCompetitionForm((current) => ({ ...current, description: value }))} rows={6} required />
+                <TextAreaField
+                  label="Résultats JSON"
+                  value={competitionForm.results}
+                  onChange={(value) => setCompetitionForm((current) => ({ ...current, results: value }))}
+                  rows={8}
+                />
+                <FormActions
+                  onReset={startNewCompetition}
+                  saving={savingTab === 'competitions'}
+                  submitLabel={competitionEditingId ? 'Mettre à jour' : 'Créer'}
+                />
+              </form>
+            </Panel>
+          </div>
+        ) : null}
+
+        {activeTab === 'messages' ? (
+          <Panel title="Messages entrants">
+            {messages.length > 0 ? (
+              <div className="space-y-4">
+                {messages.map((message) => (
+                  <div key={message.id} className="rounded-[1.5rem] border border-white/10 bg-black/20 p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-lg font-semibold text-white">{message.subject}</h3>
+                          <span
+                            className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${
+                              message.read
+                                ? 'bg-emerald/15 text-emerald-light'
+                                : 'bg-gold/15 text-gold'
+                            }`}
+                          >
+                            {message.read ? 'Lu' : 'Non lu'}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm text-text-secondary">
+                          {message.name} · {message.email} ·{' '}
+                          {new Date(message.createdAt).toLocaleString('fr-FR')}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <ActionButton
+                          onClick={() => void handleToggleMessageRead(message)}
+                          disabled={savingTab === 'messages'}
+                        >
+                          {message.read ? 'Marquer non lu' : 'Marquer lu'}
+                        </ActionButton>
+                        <DangerButton
+                          onClick={() => void handleDeleteMessage(message.id)}
+                          disabled={savingTab === 'messages'}
+                        >
+                          <Trash2 size={14} />
+                          Supprimer
+                        </DangerButton>
+                      </div>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+
+                    <p className="mt-4 whitespace-pre-wrap text-sm leading-relaxed text-white/85">
+                      {message.content}
+                    </p>
+
+                    <div className="mt-5 flex flex-wrap items-end gap-3">
+                      <div className="min-w-[220px] flex-1">
+                        <label className="mb-2 block text-[11px] font-black uppercase tracking-[0.2em] text-text-muted">
+                          Tag
+                        </label>
+                        <input
+                          value={messageTagDrafts[message.id] ?? message.tag}
+                          onChange={(event) =>
+                            setMessageTagDrafts((current) => ({
+                              ...current,
+                              [message.id]: event.target.value,
+                            }))
+                          }
+                          className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-emerald/40"
+                        />
+                      </div>
+                      <ActionButton
+                        onClick={() => void handleSaveMessageTag(message.id)}
+                        disabled={savingTab === 'messages'}
+                      >
+                        <Save size={14} />
+                        Enregistrer le tag
+                      </ActionButton>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState text="Aucun message disponible." />
+            )}
+          </Panel>
+        ) : null}
+      </main>
+    </div>
+  )
+}
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof FileText
+  label: string
+  value: string
+}) {
+  return (
+    <div className="rounded-[2rem] border border-white/10 bg-white/[0.03] p-6">
+      <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.04] text-emerald-light">
+        <Icon size={20} />
+      </div>
+      <div className="text-[11px] font-black uppercase tracking-[0.2em] text-text-muted">{label}</div>
+      <div className="mt-3 text-4xl font-bold tracking-tight text-white">{value}</div>
+    </div>
+  )
+}
+
+function Panel({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="rounded-[2rem] border border-white/10 bg-white/[0.03] p-6">
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <h2 className="text-xl font-bold text-white">{title}</h2>
+        {action}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function Alert({ tone, children }: { tone: 'error' | 'success'; children: ReactNode }) {
+  return (
+    <div
+      className={`mb-8 rounded-2xl px-4 py-3 text-sm ${
+        tone === 'error'
+          ? 'border border-red-500/20 bg-red-500/10 text-red-300'
+          : 'border border-emerald/20 bg-emerald/10 text-emerald-100'
+      }`}
+    >
+      {children}
+    </div>
+  )
+}
+
+function SimpleRow({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="flex items-start justify-between border-t border-white/5 py-4 first:border-t-0 first:pt-0 last:pb-0">
+      <div>
+        <div className="font-semibold text-white">{title}</div>
+        <div className="mt-1 text-sm text-text-secondary">{subtitle}</div>
       </div>
     </div>
-  );
+  )
 }
 
-function ContentView() {
+function RecordRow({
+  title,
+  subtitle,
+  meta,
+  onEdit,
+  onDelete,
+  busy,
+}: {
+  title: string
+  subtitle: string
+  meta: string
+  onEdit: () => void
+  onDelete: () => void
+  busy?: boolean
+}) {
   return (
-    <UnifiedTable
-      title="Content Hub"
-      count={articles.length}
-      headers={['Publication', 'Metrics', 'Author', 'Status']}
-      rows={articles.map(a => [
-        <div className="flex flex-col gap-1 max-w-xs">
-          <span className="text-white font-bold truncate tracking-tight">{a.title}</span>
-          <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">{a.category}</span>
-        </div>,
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5"><Eye size={12} className="text-zinc-600" /><span className="text-[10px] font-mono text-zinc-400">1.2k</span></div>
-          <div className="flex items-center gap-1.5"><Share2 size={12} className="text-zinc-600" /><span className="text-[10px] font-mono text-zinc-400">452</span></div>
-        </div>,
-        <span className="text-xs font-bold text-zinc-500">{a.author}</span>,
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-          <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest italic">Published</span>
-        </div>
-      ])}
-    />
-  );
-}
-
-function EventsView() {
-  return (
-    <UnifiedTable
-      title="Global Events"
-      count={competitions.length}
-      headers={['Event Identity', 'Region', 'Status', 'Participants']}
-      rows={competitions.map(c => [
-        <div className="flex flex-col gap-1">
-          <span className="text-white font-bold tracking-tight">{c.name}</span>
-          <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest font-mono">{new Date(c.startDate).toLocaleDateString('en-GB')}</span>
-        </div>,
-        <span className="text-xs font-bold text-zinc-500">{c.location}</span>,
-        <div className="flex items-center gap-2">
-          <div className={`w-1.5 h-1.5 rounded-full ${c.status === 'upcoming' ? 'bg-blue-400' : c.status === 'ongoing' ? 'bg-emerald-500' : 'bg-zinc-700'}`} />
-          <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">{c.status}</span>
-        </div>,
-        <span className="text-xs font-mono text-zinc-600">{c.participants} REG</span>
-      ])}
-    />
-  );
-}
-
-function TalentsView() {
-  return (
-    <UnifiedTable
-      title="Athlete Roster"
-      count={players.length}
-      headers={['Rank', 'Talent', 'Federation', 'Performance']}
-      rows={players.map(p => [
-        <span className="text-xl font-black italic text-zinc-800">#{p.ranking}</span>,
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-2xl bg-zinc-900 border border-white/10 overflow-hidden">
-            <img src={p.image} className="w-full h-full object-cover opacity-80" />
-          </div>
-          <span className="text-white font-bold tracking-tight">{p.name}</span>
-        </div>,
-        <div className="flex items-center gap-2">
-          <span className="text-lg">{p.countryFlag}</span>
-          <span className="text-xs font-bold text-zinc-500">{p.country}</span>
-        </div>,
-        <div className="flex items-center gap-4">
-          <span className="text-xs font-mono font-bold text-emerald-500">{p.rating}</span>
-          <div className="h-1 w-12 bg-white/5 rounded-full overflow-hidden">
-            <div className="h-full bg-emerald-500" style={{ width: `${(p.rating / 2500) * 100}%` }} />
-          </div>
-        </div>
-      ])}
-    />
-  );
-}
-
-function FederationsView() {
-  return (
-    <UnifiedTable
-      title="Federations"
-      count={countries.length}
-      headers={['Code', 'Identity', 'Clubs', 'Growth']}
-      rows={countries.map(c => [
-        <span className="text-xs font-mono font-bold text-zinc-700">{c.code}</span>,
-        <div className="flex items-center gap-4">
-          <span className="text-3xl">{c.flag}</span>
-          <div className="flex flex-col">
-            <span className="text-white font-bold tracking-tight">{c.name}</span>
-            <span className="text-[9px] text-zinc-600 font-bold uppercase truncate max-w-[140px] tracking-tighter">{c.federation}</span>
-          </div>
-        </div>,
-        <span className="text-xs font-mono text-white">{c.clubs}</span>,
-        <div className="flex items-center gap-2 text-emerald-500 font-black text-[10px] italic">
-          <TrendingUp size={12} />
-          +4.2%
-        </div>
-      ])}
-    />
-  );
-}
-
-function AssetsView() {
-  return (
-    <div className="space-y-16">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 border-b border-white/5 pb-12">
-        <div className="space-y-2">
-          <h2 className="text-5xl font-bold text-white tracking-tight italic">Static Assets</h2>
-          <p className="text-zinc-500 font-medium text-lg">Managing global media delivery and storage.</p>
-        </div>
-        <button className="h-12 px-8 rounded-2xl bg-white text-black text-[11px] font-bold uppercase tracking-widest shadow-[0_0_30px_rgba(255,255,255,0.1)] hover:bg-zinc-200 transition-all">Upload Media</button>
+    <div className="flex flex-wrap items-start justify-between gap-4 border-t border-white/5 py-4 first:border-t-0 first:pt-0 last:pb-0">
+      <div className="min-w-0">
+        <div className="font-semibold text-white">{title}</div>
+        <div className="mt-1 text-sm text-text-secondary">{subtitle}</div>
+        <div className="mt-1 text-xs uppercase tracking-[0.16em] text-text-muted">{meta}</div>
       </div>
-      
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-8">
-        {[
-          '/images/hero-scrabble.jpg', '/images/tournament.jpg', '/images/community.jpg', 
-          '/images/player1.jpg', '/images/player2.jpg', '/images/player3.jpg', 
-          '/images/player4.jpg', '/images/scrabble-tiles.jpg', '/images/country-senegal.jpg',
-          '/images/country-cotedivoire.jpg', '/images/country-cameroun.jpg', '/images/hero-scrabble.jpg'
-        ].map((img, i) => (
-          <div key={i} className="group relative aspect-[4/5] rounded-[24px] overflow-hidden border border-white/5 bg-zinc-950 transition-all duration-700 hover:border-white/20 hover:scale-[1.02]">
-            <img src={img} className="w-full h-full object-cover opacity-40 group-hover:opacity-100 group-hover:scale-110 transition-all duration-1000" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <div className="absolute bottom-4 left-4 right-4 translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
-              <div className="text-[10px] font-mono text-white/60 mb-3 truncate">IMG_094{i}.webp</div>
-              <div className="flex gap-2">
-                <button className="flex-1 h-8 rounded-lg bg-white/10 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/20 transition-colors"><Eye size={12} /></button>
-                <button className="flex-1 h-8 rounded-lg bg-red-500/20 backdrop-blur-md flex items-center justify-center text-red-400 hover:bg-red-500/30 transition-colors"><Trash2 size={12} /></button>
-              </div>
-            </div>
-          </div>
+      <div className="flex gap-2">
+        <ActionButton onClick={onEdit} disabled={busy}>
+          <Pencil size={14} />
+          Modifier
+        </ActionButton>
+        <DangerButton onClick={onDelete} disabled={busy}>
+          <Trash2 size={14} />
+          Supprimer
+        </DangerButton>
+      </div>
+    </div>
+  )
+}
+
+function ActionButton({
+  children,
+  onClick,
+  disabled,
+}: {
+  children: ReactNode
+  onClick: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-white transition-colors hover:bg-white/[0.08] disabled:opacity-60"
+    >
+      {children}
+    </button>
+  )
+}
+
+function DangerButton({
+  children,
+  onClick,
+  disabled,
+}: {
+  children: ReactNode
+  onClick: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-red-200 transition-colors hover:bg-red-500/15 disabled:opacity-60"
+    >
+      {children}
+    </button>
+  )
+}
+
+function FormActions({
+  onReset,
+  saving,
+  submitLabel,
+}: {
+  onReset: () => void
+  saving: boolean
+  submitLabel: string
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 pt-2">
+      <button
+        type="submit"
+        disabled={saving}
+        className="inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-black disabled:opacity-60"
+      >
+        {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+        {saving ? 'Enregistrement...' : submitLabel}
+      </button>
+      <button
+        type="button"
+        onClick={onReset}
+        className="rounded-2xl border border-white/10 px-5 py-3 text-xs font-black uppercase tracking-[0.2em] text-text-secondary"
+      >
+        Réinitialiser
+      </button>
+    </div>
+  )
+}
+
+function FieldLabel({ children }: { children: ReactNode }) {
+  return (
+    <label className="mb-2 block text-[11px] font-black uppercase tracking-[0.2em] text-text-muted">
+      {children}
+    </label>
+  )
+}
+
+function InputField({
+  label,
+  value,
+  onChange,
+  type = 'text',
+  placeholder,
+  required,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  type?: string
+  placeholder?: string
+  required?: boolean
+}) {
+  return (
+    <div>
+      <FieldLabel>{label}</FieldLabel>
+      <input
+        type={type}
+        value={value}
+        placeholder={placeholder}
+        required={required}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-emerald/40"
+      />
+    </div>
+  )
+}
+
+function InputWithAction({
+  label,
+  value,
+  onChange,
+  buttonLabel,
+  onAction,
+  required,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  buttonLabel: string
+  onAction: () => void
+  required?: boolean
+}) {
+  return (
+    <div>
+      <FieldLabel>{label}</FieldLabel>
+      <div className="flex gap-2">
+        <input
+          value={value}
+          required={required}
+          onChange={(event) => onChange(event.target.value)}
+          className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-emerald/40"
+        />
+        <button
+          type="button"
+          onClick={onAction}
+          className="rounded-2xl border border-white/10 px-4 py-3 text-xs font-black uppercase tracking-[0.16em] text-text-secondary"
+        >
+          {buttonLabel}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function TextAreaField({
+  label,
+  value,
+  onChange,
+  rows,
+  required,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  rows: number
+  required?: boolean
+}) {
+  return (
+    <div>
+      <FieldLabel>{label}</FieldLabel>
+      <textarea
+        value={value}
+        rows={rows}
+        required={required}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-emerald/40"
+      />
+    </div>
+  )
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  required,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: { value: string; label: string }[]
+  required?: boolean
+}) {
+  return (
+    <div>
+      <FieldLabel>{label}</FieldLabel>
+      <select
+        value={value}
+        required={required}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-white outline-none focus:border-emerald/40"
+      >
+        <option value="">Aucun</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
         ))}
-      </div>
+      </select>
     </div>
-  );
+  )
 }
 
-function InquiriesView() {
+function CheckboxField({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string
+  checked: boolean
+  onChange: (value: boolean) => void
+}) {
   return (
-    <div className="space-y-16">
-      <div className="space-y-4">
-        <h2 className="text-5xl font-bold text-white tracking-tight italic">Global Inquiries</h2>
-        <p className="text-zinc-500 font-medium text-lg">Community feedback and operational messages.</p>
-      </div>
-
-      <div className="space-y-4">
-        {[
-          { name: 'Moussa Traoré', email: 'moussa@federation.sn', subject: 'Partnership Inquiry', tag: 'High Priority', read: false },
-          { name: 'Marie Konan', email: 'marie@abidjan.ci', subject: 'Article Contribution', tag: 'Editorial', read: true },
-          { name: 'Félix Nguema', email: 'felix@gabon.ga', subject: 'Event Registration Help', tag: 'Support', read: true }
-        ].map((msg, i) => (
-          <div key={i} className={`group flex items-center gap-8 p-10 rounded-[32px] border border-white/5 hover:bg-white/[0.02] hover:border-white/10 cursor-pointer transition-all duration-500 ${!msg.read ? 'bg-white/[0.01]' : ''}`}>
-            <div className={`w-2 h-2 rounded-full ${!msg.read ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-800'}`} />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-4 mb-2">
-                <span className={`text-lg font-bold tracking-tight ${!msg.read ? 'text-white' : 'text-zinc-500'}`}>{msg.name}</span>
-                <span className="text-[10px] font-bold text-zinc-700 uppercase tracking-widest">{msg.email}</span>
-              </div>
-              <p className="text-sm font-medium text-zinc-500 group-hover:text-zinc-300 transition-colors">"{msg.subject}"</p>
-            </div>
-            <div className="flex items-center gap-6">
-              <span className="px-3 py-1 rounded-full bg-zinc-900 border border-white/5 text-[9px] font-bold text-zinc-500 uppercase tracking-widest">{msg.tag}</span>
-              <div className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 text-zinc-600 group-hover:text-white transition-colors">
-                <ChevronRight size={18} />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+    <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white">
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      {label}
+    </label>
+  )
 }
 
-function ConfigurationView() {
-  return (
-    <div className="space-y-24">
-      <div className="space-y-4">
-        <h2 className="text-5xl font-bold text-white tracking-tight italic">System Configuration</h2>
-        <p className="text-zinc-500 font-medium text-lg">Global identity, SEO and access protocols.</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-24">
-        <div className="lg:col-span-4 space-y-4">
-          <h3 className="text-xl font-bold text-white italic">Platform Metadata</h3>
-          <p className="text-sm text-zinc-600 leading-relaxed font-medium">Define how the platform appears on search engines and social media networks globally.</p>
-        </div>
-        <div className="lg:col-span-8 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-3">
-              <label className="text-[10px] font-black text-zinc-700 uppercase tracking-[0.3em]">Site Title</label>
-              <input type="text" defaultValue="Scrabble Pro Afrique" className="w-full h-14 px-6 rounded-2xl bg-white/[0.02] border border-white/5 text-white font-bold text-sm focus:border-white/20 transition-all outline-none" />
-            </div>
-            <div className="space-y-3">
-              <label className="text-[10px] font-black text-zinc-700 uppercase tracking-[0.3em]">Environment</label>
-              <div className="w-full h-14 px-6 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="text-sm font-bold text-white">Production Cluster</span>
-              </div>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <label className="text-[10px] font-black text-zinc-700 uppercase tracking-[0.3em]">Global Meta Description</label>
-            <textarea rows={4} className="w-full p-6 rounded-3xl bg-white/[0.02] border border-white/5 text-white font-medium text-sm focus:border-white/20 transition-all outline-none resize-none" defaultValue="The world-class editorial platform for Scrabble in French-speaking Africa." />
-          </div>
-          <button className="h-14 px-10 rounded-2xl bg-white text-black text-[11px] font-black uppercase tracking-[0.2em] shadow-[0_0_40px_rgba(255,255,255,0.1)] hover:scale-105 active:scale-95 transition-all">Persist Configuration</button>
-        </div>
-
-        <div className="lg:col-span-12 border-t border-white/5 pt-24" />
-
-        <div className="lg:col-span-4 space-y-4">
-          <h3 className="text-xl font-bold text-white italic">Access Control</h3>
-          <p className="text-sm text-zinc-600 leading-relaxed font-medium">Managing administrative privileges and identity provider integrations.</p>
-        </div>
-        <div className="lg:col-span-8">
-          <div className="rounded-[40px] bg-white/[0.02] border border-white/5 divide-y divide-white/5">
-            {[
-              { name: 'Amadou Diallo', role: 'Superuser', status: 'Online' },
-              { name: 'Core Engine', role: 'System', status: 'Active' },
-              { name: 'External API', role: 'Integrator', status: 'Offline' }
-            ].map((node, i) => (
-              <div key={i} className="flex items-center justify-between p-8 group hover:bg-white/[0.01] transition-all">
-                <div className="flex items-center gap-6">
-                  <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-500 group-hover:text-white transition-all font-black italic">
-                    {node.name[0]}
-                  </div>
-                  <div>
-                    <div className="text-lg font-bold text-white tracking-tight">{node.name}</div>
-                    <div className="text-[10px] font-mono text-zinc-700 font-bold uppercase tracking-tighter">NODE_ID: 0x2A98_{i}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-12">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-1.5 h-1.5 rounded-full ${node.status === 'Online' || node.status === 'Active' ? 'bg-emerald-500' : 'bg-zinc-800'}`} />
-                    <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">{node.status}</span>
-                  </div>
-                  <div className="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-black text-zinc-400 uppercase tracking-widest">{node.role}</div>
-                  <MoreHorizontal size={20} className="text-zinc-800 hover:text-white transition-colors cursor-pointer" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+function EmptyState({ text }: { text: string }) {
+  return <p className="text-sm text-text-secondary">{text}</p>
 }

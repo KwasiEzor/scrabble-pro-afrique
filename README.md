@@ -1,73 +1,95 @@
-# React + TypeScript + Vite
+# Scrabble Pro Afrique
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend React/Vite for a Scrabble portal focused on francophone Africa, backed by Supabase for content, contact messages, and admin authentication.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- React 19
+- Vite 7
+- TypeScript
+- Tailwind CSS 4
+- Supabase Auth + Database
+- Zustand
+- Framer Motion
 
-## React Compiler
+## Environment
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Create a local `.env` from `.env.example`.
 
-## Expanding the ESLint configuration
+Required variables:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `VITE_TURNSTILE_SITE_KEY`
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Legacy fallback:
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- `VITE_SUPABASE_ANON_KEY`
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Optional brand links:
+
+- `VITE_SOCIAL_FACEBOOK_URL`
+- `VITE_SOCIAL_TWITTER_URL`
+- `VITE_SOCIAL_INSTAGRAM_URL`
+- `VITE_SOCIAL_YOUTUBE_URL`
+- `VITE_SOCIAL_GITHUB_URL`
+- `VITE_SOCIAL_LINKEDIN_URL`
+
+The app now initializes Supabase defensively. If env vars are missing, public pages still render with static fallback content and `/admin` shows a configuration error instead of crashing the app.
+
+## Development
+
+```bash
+npm ci
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Quality Gate
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run lint
+npm run test:run
+npm run build
+npm run check
 ```
+
+## Supabase Setup
+
+Schema files live in `supabase/`.
+
+- Main migration: `supabase/migrations/20260412000000_initial_schema.sql`
+- Seed data: `supabase/seed.sql`
+- One-shot bootstrap: `supabase/one_click_setup.sql`
+
+Admin access is expected to come from either:
+
+- `app_metadata.role = 'admin'`
+- or an authenticated email ending in `@scrabblepro.africa`
+
+The role-based path is preferred.
+
+## Deployment
+
+This repo is prepared for SPA deployment:
+
+- `vercel.json` rewrites all routes to `index.html`
+- `public/_redirects` supports Netlify-style redirects
+- `.github/workflows/ci.yml` runs lint and build on push/PR
+
+Recommended deployment checklist:
+
+1. Set `VITE_SUPABASE_URL`
+2. Set `VITE_SUPABASE_PUBLISHABLE_KEY`
+3. Create at least one Supabase Auth admin user
+4. Assign `app_metadata.role = 'admin'` for that user if possible
+5. Run the SQL migrations and seed scripts in Supabase
+6. Set the Edge Function secret `TURNSTILE_SECRET_KEY`
+7. Deploy the Edge Function in `supabase/functions/submit-message`
+8. Verify `npm run check` passes before shipping
+
+## Remaining Work
+
+This pass makes the app buildable, lint-clean, deployable, and materially safer, but there is still production work left:
+
+- add broader route and admin workflow tests
+- add observability and error reporting

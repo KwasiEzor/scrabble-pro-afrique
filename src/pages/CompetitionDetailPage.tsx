@@ -2,25 +2,19 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Calendar, MapPin, Users, Trophy } from 'lucide-react';
-import { competitionService } from '../lib/services';
 import { competitions as staticCompetitions } from '../lib/data';
 import type { Competition } from '../lib/data';
+import { loadCompetitionBySlug } from '../lib/siteContent';
 import SEO from '../components/SEO';
 
 export default function CompetitionDetailPage() {
   const { slug } = useParams();
   const [comp, setComp] = useState<Competition | null>(staticCompetitions.find(c => c.slug === slug) || null);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     async function loadData() {
       if (!slug) return;
-      try {
-        const data = await competitionService.getBySlug(slug).catch(() => null);
-        if (data) setComp(data);
-      } catch (error) {
-        console.error("Error loading competition from Supabase:", error);
-      }
+      setComp(await loadCompetitionBySlug(slug));
     }
     loadData();
   }, [slug]);

@@ -3,25 +3,17 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users, Building2 } from 'lucide-react';
 import SectionTitle from '../components/SectionTitle';
-import { countryService } from '../lib/services';
 import { countries as staticCountries } from '../lib/data';
 import type { Country } from '../lib/data';
+import { loadCountries as fetchCountries } from '../lib/siteContent';
 import SEO from '../components/SEO';
 
 export default function PaysPage() {
   const [countries, setCountries] = useState<Country[]>(staticCountries);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     async function loadCountries() {
-      try {
-        const data = await countryService.getAll().catch(() => null);
-        if (data && data.length > 0) {
-          setCountries(data);
-        }
-      } catch (error) {
-        console.error("Error loading countries:", error);
-      }
+      setCountries(await fetchCountries());
     }
     loadCountries();
   }, []);
