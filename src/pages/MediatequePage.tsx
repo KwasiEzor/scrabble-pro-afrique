@@ -4,18 +4,18 @@ import { Play, Image, Film, X } from 'lucide-react';
 import SectionTitle from '../components/SectionTitle';
 
 const mediaItems = [
-  { id: '1', type: 'photo', title: 'Championnat d\'Afrique 2024', image: '/images/tournament.jpg', category: '\u00c9v\u00e9nement' },
+  { id: '1', type: 'photo', title: 'Championnat d\'Afrique 2024', image: '/images/tournament.jpg', category: 'Événement' },
   { id: '2', type: 'photo', title: 'Finale Dames', image: '/images/player2.jpg', category: 'Portrait' },
   { id: '3', type: 'photo', title: 'Plateau de jeu', image: '/images/scrabble-tiles.jpg', category: 'Jeu' },
-  { id: '4', type: 'photo', title: 'Communaut\u00e9 Dakar', image: '/images/community.jpg', category: '\u00c9v\u00e9nement' },
-  { id: '5', type: 'photo', title: 'S\u00e9n\u00e9gal', image: '/images/country-senegal.jpg', category: 'Pays' },
-  { id: '6', type: 'photo', title: 'C\u00f4te d\'Ivoire', image: '/images/country-cotedivoire.jpg', category: 'Pays' },
+  { id: '4', type: 'photo', title: 'Communauté Dakar', image: '/images/community.jpg', category: 'Événement' },
+  { id: '5', type: 'photo', title: 'Sénégal', image: '/images/country-senegal.jpg', category: 'Pays' },
+  { id: '6', type: 'photo', title: 'Côte d\'Ivoire', image: '/images/country-cotedivoire.jpg', category: 'Pays' },
   { id: '7', type: 'photo', title: 'Champion 2024', image: '/images/player1.jpg', category: 'Portrait' },
   { id: '8', type: 'photo', title: 'Cameroun', image: '/images/country-cameroun.jpg', category: 'Pays' },
   { id: '9', type: 'photo', title: 'Scrabble Board', image: '/images/hero-scrabble.jpg', category: 'Jeu' },
 ];
 
-const categories = ['Tous', '\u00c9v\u00e9nement', 'Portrait', 'Pays', 'Jeu'];
+const categories = ['Tous', 'Événement', 'Portrait', 'Pays', 'Jeu'];
 
 export default function MediatequePage() {
   const [activeCategory, setActiveCategory] = useState('Tous');
@@ -28,8 +28,8 @@ export default function MediatequePage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionTitle
           overline="Galerie"
-          title="M\u00e9diath\u00e8que"
-          subtitle="Photos, vid\u00e9os et moments forts du Scrabble africain"
+          title="Médiathèque"
+          subtitle="Photos, vidéos et moments forts du Scrabble africain"
         />
 
         <div className="flex flex-wrap gap-2 mb-10">

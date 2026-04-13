@@ -1,73 +1,112 @@
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Users, Building2, Trophy } from 'lucide-react';
-import { countries, players, articles, competitions } from '../lib/data';
+import { ArrowLeft, Users, Building2, Trophy, Globe } from 'lucide-react';
+import { countryService } from '../lib/services';
+import { countries as staticCountries, players as staticPlayers, articles as staticArticles } from '../lib/data';
+import type { Country, Player, Article } from '../lib/data';
 import PlayerCard from '../components/PlayerCard';
 import ArticleCard from '../components/ArticleCard';
+import SEO from '../components/SEO';
 
 export default function CountryDetailPage() {
-  const { id } = useParams();
-  const country = countries.find(c => c.id === id);
+  const { slug } = useParams();
+  const [country, setCountry] = useState<Country | null>(staticCountries.find(c => c.slug === slug) || null);
+  const [countryPlayers, setCountryPlayers] = useState<Player[]>(staticPlayers.filter(p => p.country === country?.name));
+  const [countryArticles, setCountryArticles] = useState<Article[]>(staticArticles.filter(a => a.country === country?.name).slice(0, 3));
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    async function loadData() {
+      if (!slug) return;
+      try {
+        const data = await countryService.getBySlug(slug).catch(() => null);
+        if (data) {
+          setCountry(data);
+          setCountryPlayers(staticPlayers.filter(p => p.country === data.name));
+          setCountryArticles(staticArticles.filter(a => a.country === data.name).slice(0, 3));
+        }
+      } catch (error) {
+        console.error("Error loading country from Supabase:", error);
+      }
+    }
+    loadData();
+  }, [slug]);
 
   if (!country) {
     return (
-      <div className="pt-32 pb-20 text-center">
-        <h1 className="text-2xl font-bold text-text-primary">Pays non trouv\u00e9</h1>
+      <div className="pt-32 pb-20 text-center bg-bg-primary min-h-screen">
+        <h1 className="text-2xl font-bold text-text-primary">Pays non trouvé</h1>
         <Link to="/pays" className="text-emerald-light mt-4 inline-block">Retour</Link>
       </div>
     );
   }
 
-  const countryPlayers = players.filter(p => p.country === country.name);
-  const countryArticles = articles.filter(a => a.country === country.name).slice(0, 3);
-
   return (
-    <div className="pt-20 pb-20">
-      <div className="relative h-[40vh] overflow-hidden">
-        <img src={country.image} alt={country.name} className="w-full h-full object-cover" />
+    <div className="pt-20 pb-20 bg-bg-primary min-h-screen">
+      <SEO 
+        title={`${country.name} - Scrabble National`} 
+        description={`Découvrez l'écosystème du Scrabble en ${country.name}. ${country.federation}, ${country.clubs} clubs et ${country.players} joueurs actifs.`} 
+        image={country.image}
+      />
+      
+      <div className="relative h-[45vh] sm:h-[55vh] overflow-hidden">
+        <img src={country.image} alt={country.name} className="w-full h-full object-cover grayscale opacity-40" />
         <div className="absolute inset-0 bg-gradient-to-t from-bg-primary via-bg-primary/60 to-transparent" />
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 -mt-20 relative z-10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 -mt-32 relative z-10">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <Link to="/pays" className="inline-flex items-center gap-2 text-sm text-text-muted hover:text-emerald-light transition-colors mb-6">
-            <ArrowLeft size={16} /> Retour aux pays
+          <Link to="/pays" className="inline-flex items-center gap-2 text-sm text-text-muted hover:text-white transition-colors mb-8 bg-white/5 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
+            <ArrowLeft size={16} /> Fédérations Nationales
           </Link>
 
-          <div className="glass rounded-2xl p-8 lg:p-10 mb-12">
-            <div className="flex items-center gap-4 mb-6">
-              <span className="text-5xl">{country.flag}</span>
+          <div className="glass rounded-[3rem] p-8 lg:p-14 border-white/5 shadow-2xl mb-16 relative overflow-hidden">
+            <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 bg-emerald/10 blur-[100px] rounded-full" />
+            
+            <div className="flex flex-col md:flex-row md:items-center gap-8 mb-10">
+              <div className="text-7xl sm:text-8xl filter drop-shadow-2xl">{country.flag}</div>
               <div>
-                <h1 className="font-[var(--font-display)] text-3xl sm:text-4xl font-bold text-text-primary">{country.name}</h1>
-                <p className="text-emerald-light font-medium">{country.federation}</p>
+                <h1 className="font-[var(--font-display)] text-4xl sm:text-6xl font-black text-white tracking-tighter mb-2 italic">
+                  {country.name}
+                </h1>
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl bg-emerald/10 border border-emerald/20 text-emerald-light text-[10px] font-black uppercase tracking-[0.2em]">
+                  <Globe size={12} />
+                  {country.federation}
+                </div>
               </div>
             </div>
 
-            <p className="text-text-secondary leading-relaxed mb-8">{country.description}</p>
+            <p className="text-xl text-text-secondary leading-relaxed mb-12 font-light max-w-4xl italic">
+              "{country.description}"
+            </p>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <div className="bg-bg-tertiary rounded-xl p-5 text-center">
-                <Building2 size={20} className="text-emerald-light mx-auto mb-2" />
-                <div className="text-2xl font-bold font-mono text-emerald-light">{country.clubs}</div>
-                <div className="text-xs text-text-muted mt-1">Clubs</div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <div className="bg-white/5 rounded-3xl p-8 border border-white/5 transition-all hover:bg-white/[0.08] group">
+                <Building2 size={28} className="text-emerald-light mb-4 group-hover:scale-110 transition-transform" />
+                <div className="text-4xl font-black font-mono text-white mb-1 tabular-nums">{country.clubs}</div>
+                <div className="text-[10px] text-text-muted font-bold uppercase tracking-widest">Clubs Affiliés</div>
               </div>
-              <div className="bg-bg-tertiary rounded-xl p-5 text-center">
-                <Users size={20} className="text-gold mx-auto mb-2" />
-                <div className="text-2xl font-bold font-mono text-gold">{country.players}</div>
-                <div className="text-xs text-text-muted mt-1">Joueurs</div>
+              <div className="bg-white/5 rounded-3xl p-8 border border-white/5 transition-all hover:bg-white/[0.08] group">
+                <Users size={28} className="text-gold mb-4 group-hover:scale-110 transition-transform" />
+                <div className="text-4xl font-black font-mono text-white mb-1 tabular-nums">{country.players}</div>
+                <div className="text-[10px] text-text-muted font-bold uppercase tracking-widest">Joueurs Licenciés</div>
               </div>
-              <div className="bg-bg-tertiary rounded-xl p-5 text-center col-span-2 sm:col-span-1">
-                <Trophy size={20} className="text-bordeaux-light mx-auto mb-2" />
-                <div className="text-2xl font-bold font-mono text-bordeaux-light">{countryPlayers.length}</div>
-                <div className="text-xs text-text-muted mt-1">Top joueurs</div>
+              <div className="bg-white/5 rounded-3xl p-8 border border-white/5 transition-all hover:bg-white/[0.08] group">
+                <Trophy size={28} className="text-bordeaux-light mb-4 group-hover:scale-110 transition-transform" />
+                <div className="text-4xl font-black font-mono text-white mb-1 tabular-nums">{countryPlayers.length}</div>
+                <div className="text-[10px] text-text-muted font-bold uppercase tracking-widest">Membres du Top 100</div>
               </div>
             </div>
           </div>
 
           {countryPlayers.length > 0 && (
-            <div className="mb-12">
-              <h2 className="font-[var(--font-display)] text-2xl font-bold text-text-primary mb-6">Joueurs marquants</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div className="mb-20">
+              <h2 className="font-[var(--font-display)] text-3xl font-bold text-white mb-10 flex items-center gap-4 tracking-tight">
+                <div className="w-12 h-px bg-emerald" />
+                Champions Nationaux
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                 {countryPlayers.map((p, i) => (
                   <PlayerCard key={p.id} player={p} index={i} />
                 ))}
@@ -77,8 +116,11 @@ export default function CountryDetailPage() {
 
           {countryArticles.length > 0 && (
             <div>
-              <h2 className="font-[var(--font-display)] text-2xl font-bold text-text-primary mb-6">Actualit\u00e9s</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              <h2 className="font-[var(--font-display)] text-3xl font-bold text-white mb-10 flex items-center gap-4 tracking-tight">
+                <div className="w-12 h-px bg-gold" />
+                Dernières Actualités
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
                 {countryArticles.map((a, i) => (
                   <ArticleCard key={a.id} article={a} index={i} />
                 ))}

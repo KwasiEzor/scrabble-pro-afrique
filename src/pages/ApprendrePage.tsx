@@ -8,20 +8,20 @@ const sections = [
   {
     id: 'regles',
     icon: BookOpen,
-    title: 'R\u00e8gles du jeu',
+    title: 'Règles du jeu',
     color: 'emerald',
     content: [
       {
-        q: 'Comment se d\u00e9roule une partie ?',
-        a: 'Le Scrabble se joue \u00e0 2, 3 ou 4 joueurs. Chaque joueur dispose de 7 lettres tir\u00e9es au hasard. \u00c0 tour de r\u00f4le, les joueurs forment des mots sur le plateau de 15x15 cases. Le premier mot doit passer par la case centrale. Les mots suivants doivent se raccorder aux mots d\u00e9j\u00e0 pos\u00e9s.'
+        q: 'Comment se déroule une partie ?',
+        a: 'Le Scrabble se joue à 2, 3 ou 4 joueurs. Chaque joueur dispose de 7 lettres tirées au hasard. À tour de rôle, les joueurs forment des mots sur le plateau de 15x15 cases. Le premier mot doit passer par la case centrale. Les mots suivants doivent se raccorder aux mots déjà posés.'
       },
       {
         q: 'Comment compter les points ?',
-        a: 'Chaque lettre a une valeur en points. Les cases sp\u00e9ciales multiplient la valeur d\'une lettre (\u00d72, \u00d73) ou d\'un mot (\u00d72, \u00d73). Un \u00ab Scrabble \u00bb (7 lettres pos\u00e9es d\'un coup) rapporte un bonus de 50 points.'
+        a: 'Chaque lettre a une valeur en points. Les cases spéciales multiplient la valeur d\'une lettre (×2, ×3) ou d\'un mot (×2, ×3). Un « Scrabble » (7 lettres posées d\'un coup) rapporte un bonus de 50 points.'
       },
       {
         q: 'Quand la partie se termine-t-elle ?',
-        a: 'La partie se termine quand un joueur pose toutes ses lettres et que le sac est vide, ou quand tous les joueurs passent cons\u00e9cutivement. Les points des lettres restantes sont d\u00e9duits.'
+        a: 'La partie se termine quand un joueur pose toutes ses lettres et que le sac est vide, ou quand tous les joueurs passent consécutivement. Les points des lettres restantes sont déduits.'
       }
     ]
   },
@@ -33,55 +33,55 @@ const sections = [
     content: [
       {
         q: 'Qu\'est-ce que le Scrabble classique ?',
-        a: 'Le mode classique est le format traditionnel o\u00f9 chaque joueur tire ses propres lettres. Le hasard du tirage joue un r\u00f4le important. C\'est le format le plus jou\u00e9 en famille et entre amis.'
+        a: 'Le mode classique est le format traditionnel où chaque joueur tire ses propres lettres. Le hasard du tirage joue un rôle important. C\'est le format le plus joué en famille et entre amis.'
       },
       {
         q: 'Qu\'est-ce que le Scrabble duplicate ?',
-        a: 'En duplicate, tous les joueurs jouent avec les m\u00eames lettres simultan\u00e9ment. C\'est le format comp\u00e9titif par excellence car il \u00e9limine le facteur chance. Chaque joueur cherche le meilleur coup possible avec le m\u00eame tirage.'
+        a: 'En duplicate, tous les joueurs jouent avec les mêmes lettres simultanément. C\'est le format compétitif par excellence car il élimine le facteur chance. Chaque joueur cherche le meilleur coup possible avec le même tirage.'
       },
       {
-        q: 'Quel format est utilis\u00e9 en comp\u00e9tition ?',
-        a: 'En Afrique francophone, les deux formats sont pratiqu\u00e9s. Le duplicate est privil\u00e9gi\u00e9 dans les grandes comp\u00e9titions internationales. Le classique reste tr\u00e8s populaire dans les tournois locaux et r\u00e9gionaux.'
+        q: 'Quel format est utilisé en compétition ?',
+        a: 'En Afrique francophone, les deux formats sont pratiqués. Le duplicate est privilégié dans les grandes compétitions internationales. Le classique reste très populaire dans les tournois locaux et régionaux.'
       }
     ]
   },
   {
     id: 'debutants',
     icon: Lightbulb,
-    title: 'Conseils d\u00e9butants',
+    title: 'Conseils débutants',
     color: 'bordeaux',
     content: [
       {
-        q: 'Par o\u00f9 commencer ?',
-        a: 'Apprenez d\'abord les mots de 2 lettres (il y en a environ 80 en fran\u00e7ais). Ils sont essentiels pour placer des mots en parall\u00e8le et maximiser vos points. Ensuite, familiarisez-vous avec les mots de 3 lettres.'
+        q: 'Par où commencer ?',
+        a: 'Apprenez d\'abord les mots de 2 lettres (il y en a environ 80 en français). Ils sont essentiels pour placer des mots en parallèle et maximiser vos points. Ensuite, familiarisez-vous avec les mots de 3 lettres.'
       },
       {
-        q: 'Comment am\u00e9liorer son vocabulaire ?',
-        a: 'Lisez r\u00e9guli\u00e8rement, jouez souvent, et utilisez des listes de mots sp\u00e9cifiques au Scrabble. Les \u00ab benjamins \u00bb (mots de 7-8 lettres courants) sont particuli\u00e8rement utiles pour r\u00e9aliser des Scrabbles.'
+        q: 'Comment améliorer son vocabulaire ?',
+        a: 'Lisez régulièrement, jouez souvent, et utilisez des listes de mots spécifiques au Scrabble. Les « benjamins » (mots de 7-8 lettres courants) sont particulièrement utiles pour réaliser des Scrabbles.'
       },
       {
         q: 'Faut-il rejoindre un club ?',
-        a: 'Absolument ! Rejoindre un club est le meilleur moyen de progresser. Vous b\u00e9n\u00e9ficierez de l\'exp\u00e9rience des joueurs confirm\u00e9s, de parties r\u00e9guli\u00e8res et d\'un cadre motivant.'
+        a: 'Absolument ! Rejoindre un club est le meilleur moyen de progresser. Vous bénéficierez de l\'expérience des joueurs confirmés, de parties régulières et d\'un cadre motivant.'
       }
     ]
   },
   {
     id: 'strategie',
     icon: Target,
-    title: 'Strat\u00e9gie avanc\u00e9e',
+    title: 'Stratégie avancée',
     color: 'emerald',
     content: [
       {
-        q: 'Comment g\u00e9rer son chevalet ?',
-        a: '\u00c9quilibrez voyelles et consonnes (id\u00e9alement 3-4 consonnes et 3-4 voyelles). \u00c9vitez les doublons. Gardez des lettres polyvalentes (S, E, R, A, I, N, T) qui facilitent les Scrabbles.'
+        q: 'Comment gérer son chevalet ?',
+        a: 'Équilibrez voyelles et consonnes (idéalement 3-4 consonnes et 3-4 voyelles). Évitez les doublons. Gardez des lettres polyvalentes (S, E, R, A, I, N, T) qui facilitent les Scrabbles.'
       },
       {
-        q: 'Quand faut-il \u00e9changer des lettres ?',
-        a: '\u00c9changez quand votre chevalet est d\u00e9s\u00e9quilibr\u00e9 (trop de voyelles ou consonnes) et que vous ne pouvez pas faire un coup d\u00e9cent. En classique, c\'est parfois la meilleure strat\u00e9gie.'
+        q: 'Quand faut-il échanger des lettres ?',
+        a: 'Échangez quand votre chevalet est déséquilibré (trop de voyelles ou consonnes) et que vous ne pouvez pas faire un coup décent. En classique, c\'est parfois la meilleure stratégie.'
       },
       {
         q: 'Comment utiliser les cases bonus ?',
-        a: 'Planifiez vos coups pour atteindre les cases \u00ab mot compte triple \u00bb. Placez vos lettres de haute valeur (J, K, Q, W, X, Y, Z) sur les cases \u00ab lettre compte double/triple \u00bb pour maximiser les points.'
+        a: 'Planifiez vos coups pour atteindre les cases « mot compte triple ». Placez vos lettres de haute valeur (J, K, Q, W, X, Y, Z) sur les cases « lettre compte double/triple » pour maximiser les points.'
       }
     ]
   }
@@ -103,7 +103,7 @@ export default function ApprendrePage() {
           <SectionTitle
             overline="Formation"
             title="Apprendre le Scrabble"
-            subtitle="Tout ce qu'il faut savoir pour d\u00e9buter et progresser au Scrabble francophone"
+            subtitle="Tout ce qu'il faut savoir pour débuter et progresser au Scrabble francophone"
             align="center"
           />
         </div>

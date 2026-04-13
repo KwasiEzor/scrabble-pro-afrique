@@ -14,23 +14,36 @@ export default function SectionTitle({ overline, title, subtitle, align = 'left'
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-50px' }}
-      transition={{ duration: 0.6 }}
-      className={`mb-10 ${align === 'center' ? 'text-center' : ''}`}
+      transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+      className={`mb-12 ${align === 'center' ? 'text-center' : ''}`}
     >
       {overline && (
-        <div className="flex items-center gap-3 mb-3" style={align === 'center' ? { justifyContent: 'center' } : {}}>
-          <div className="w-8 h-px bg-gradient-to-r from-emerald to-gold" />
-          <span className="text-xs uppercase tracking-[0.2em] font-semibold text-emerald-light">{overline}</span>
-          <div className="w-8 h-px bg-gradient-to-r from-gold to-emerald" />
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, x: -10 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2, duration: 0.6 }}
+          className="flex items-center gap-3 mb-4" 
+          style={align === 'center' ? { justifyContent: 'center' } : {}}
+        >
+          <span className="text-[10px] uppercase tracking-[0.4em] font-bold text-gold/80 bg-gold/10 px-2 py-0.5 rounded-sm">{overline}</span>
+        </motion.div>
       )}
-      <h2 className={`font-[var(--font-display)] font-bold leading-tight ${
-        light ? 'text-bg-primary' : 'text-text-primary'
-      } text-2xl sm:text-3xl lg:text-4xl`}>
-        {title}
-      </h2>
+      <div className={`relative inline-block ${align === 'center' ? 'mx-auto' : ''}`}>
+        <h2 className={`font-[var(--font-display)] font-bold leading-tight relative z-10 ${
+          light ? 'text-bg-primary' : 'text-text-primary'
+        } text-3xl sm:text-4xl lg:text-5xl`}>
+          {title}
+        </h2>
+        <motion.div 
+          initial={{ width: 0 }}
+          whileInView={{ width: '40%' }}
+          transition={{ delay: 0.4, duration: 1, ease: "circOut" }}
+          className="h-1 bg-gradient-to-r from-emerald to-transparent mt-2 rounded-full"
+          style={align === 'center' ? { margin: '8px auto 0' } : {}}
+        />
+      </div>
       {subtitle && (
-        <p className={`mt-3 text-base max-w-2xl leading-relaxed ${
+        <p className={`mt-6 text-lg max-w-2xl leading-relaxed font-light ${
           light ? 'text-bg-primary/70' : 'text-text-secondary'
         } ${align === 'center' ? 'mx-auto' : ''}`}>
           {subtitle}

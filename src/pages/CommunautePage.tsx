@@ -26,8 +26,8 @@ export default function CommunautePage() {
           </div>
           <SectionTitle
             overline="Ensemble"
-            title="Communaut\u00e9"
-            subtitle="Rejoignez la communaut\u00e9 du Scrabble francophone africain. Partagez, contribuez, connectez-vous."
+            title="Communauté"
+            subtitle="Rejoignez la communauté du Scrabble francophone africain. Partagez, contribuez, connectez-vous."
             align="center"
           />
         </div>
@@ -51,7 +51,7 @@ export default function CommunautePage() {
             >
               <Icon size={28} className="mx-auto mb-3" />
               <div className="text-sm font-semibold text-text-primary">{label}</div>
-              <div className="text-xs text-text-muted mt-1">{followers} abonn\u00e9s</div>
+              <div className="text-xs text-text-muted mt-1">{followers} abonnés</div>
             </motion.a>
           ))}
         </div>
@@ -64,14 +64,14 @@ export default function CommunautePage() {
           className="glass rounded-2xl p-8 lg:p-10"
         >
           <h2 className="font-[var(--font-display)] text-2xl font-bold text-text-primary mb-2">Contribuer</h2>
-          <p className="text-text-secondary mb-8">Vous souhaitez partager une actualit\u00e9, proposer un \u00e9v\u00e9nement ou contribuer au projet ?</p>
+          <p className="text-text-secondary mb-8">Vous souhaitez partager une actualité, proposer un événement ou contribuer au projet ?</p>
 
           {/* Tabs */}
           <div className="flex flex-wrap gap-2 mb-8">
             {[
               { key: 'article' as const, icon: Newspaper, label: 'Soumettre un article' },
-              { key: 'event' as const, icon: Calendar, label: 'Proposer un \u00e9v\u00e9nement' },
-              { key: 'contribution' as const, icon: Heart, label: 'Appel \u00e0 contribution' },
+              { key: 'event' as const, icon: Calendar, label: 'Proposer un événement' },
+              { key: 'contribution' as const, icon: Heart, label: 'Appel à contribution' },
             ].map(({ key, icon: Icon, label }) => (
               <button
                 key={key}
@@ -94,7 +94,7 @@ export default function CommunautePage() {
                 <Send size={28} className="text-emerald-light" />
               </div>
               <h3 className="text-xl font-bold text-text-primary mb-2">Merci !</h3>
-              <p className="text-text-secondary">Votre contribution a \u00e9t\u00e9 envoy\u00e9e. Nous reviendrons vers vous rapidement.</p>
+              <p className="text-text-secondary">Votre contribution a été envoyée. Nous reviendrons vers vous rapidement.</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -130,7 +130,7 @@ export default function CommunautePage() {
                   value={formData.subject}
                   onChange={e => setFormData({ ...formData, subject: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl bg-bg-tertiary border border-border-subtle text-text-primary placeholder:text-text-muted outline-none focus:border-emerald/50 transition-colors"
-                  placeholder={formType === 'article' ? 'Titre de l\'article' : formType === 'event' ? 'Nom de l\'\u00e9v\u00e9nement' : 'Objet de votre contribution'}
+                  placeholder={formType === 'article' ? 'Titre de l\'article' : formType === 'event' ? 'Nom de l\'événement' : 'Objet de votre contribution'}
                 />
               </div>
               <div>
@@ -141,7 +141,7 @@ export default function CommunautePage() {
                   value={formData.message}
                   onChange={e => setFormData({ ...formData, message: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl bg-bg-tertiary border border-border-subtle text-text-primary placeholder:text-text-muted outline-none focus:border-emerald/50 transition-colors resize-none"
-                  placeholder="D\u00e9crivez votre contribution en d\u00e9tail..."
+                  placeholder="Décrivez votre contribution en détail..."
                 />
               </div>
               <button

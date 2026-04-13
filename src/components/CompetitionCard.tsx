@@ -20,7 +20,7 @@ export default function CompetitionCard({ competition, index = 0 }: { competitio
       transition={{ duration: 0.5, delay: index * 0.1 }}
     >
       <Link
-        to={`/competitions/${competition.id}`}
+        to={`/competitions/${competition.slug}`}
         className="group block bg-bg-card rounded-2xl overflow-hidden border border-border-subtle hover:border-gold/30 transition-all duration-300 hover:shadow-xl hover:shadow-gold/5"
       >
         <div className="relative overflow-hidden aspect-[16/9]">

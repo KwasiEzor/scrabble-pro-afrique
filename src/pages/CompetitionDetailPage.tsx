@@ -1,97 +1,129 @@
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Calendar, MapPin, Users, Trophy, Clock } from 'lucide-react';
-import { competitions } from '../lib/data';
+import { ArrowLeft, Calendar, MapPin, Users, Trophy } from 'lucide-react';
+import { competitionService } from '../lib/services';
+import { competitions as staticCompetitions } from '../lib/data';
+import type { Competition } from '../lib/data';
+import SEO from '../components/SEO';
 
 export default function CompetitionDetailPage() {
-  const { id } = useParams();
-  const comp = competitions.find(c => c.id === id);
+  const { slug } = useParams();
+  const [comp, setComp] = useState<Competition | null>(staticCompetitions.find(c => c.slug === slug) || null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    async function loadData() {
+      if (!slug) return;
+      try {
+        const data = await competitionService.getBySlug(slug).catch(() => null);
+        if (data) setComp(data);
+      } catch (error) {
+        console.error("Error loading competition from Supabase:", error);
+      }
+    }
+    loadData();
+  }, [slug]);
 
   if (!comp) {
     return (
-      <div className="pt-32 pb-20 text-center">
-        <h1 className="text-2xl font-bold text-text-primary">Comp\u00e9tition non trouv\u00e9e</h1>
+      <div className="pt-32 pb-20 text-center bg-bg-primary min-h-screen">
+        <h1 className="text-2xl font-bold text-text-primary">Compétition non trouvée</h1>
         <Link to="/competitions" className="text-emerald-light mt-4 inline-block">Retour</Link>
       </div>
     );
   }
 
-  const statusConfig: Record<string, { label: string; color: string }> = {
-    upcoming: { label: '\u00c0 venir', color: 'bg-emerald/20 text-emerald-light' },
-    ongoing: { label: 'En cours', color: 'bg-gold/20 text-gold-light' },
-    completed: { label: 'Termin\u00e9', color: 'bg-text-muted/20 text-text-muted' },
+  const statusConfig: Record<string, { label: string; color: string; dot: string }> = {
+    upcoming: { label: 'À venir', color: 'bg-emerald/20 text-emerald-light', dot: 'bg-emerald-light' },
+    ongoing: { label: 'En cours', color: 'bg-gold/20 text-gold-light', dot: 'bg-gold animate-pulse' },
+    completed: { label: 'Terminé', color: 'bg-white/10 text-text-muted', dot: 'bg-text-muted' },
   };
   const status = statusConfig[comp.status];
 
   return (
-    <div className="pt-20 pb-20">
-      <div className="relative h-[40vh] sm:h-[50vh] overflow-hidden">
+    <div className="pt-20 pb-20 bg-bg-primary min-h-screen">
+      <SEO 
+        title={comp.name} 
+        description={`${comp.name} à ${comp.location}. ${comp.description}`} 
+        image={comp.image}
+      />
+      
+      <div className="relative h-[40vh] sm:h-[55vh] overflow-hidden">
         <img src={comp.image} alt={comp.name} className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-bg-primary via-bg-primary/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-bg-primary via-bg-primary/40 to-transparent" />
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 -mt-24 relative z-10">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 -mt-32 relative z-10">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <Link to="/competitions" className="inline-flex items-center gap-2 text-sm text-text-muted hover:text-emerald-light transition-colors mb-6">
-            <ArrowLeft size={16} /> Retour aux comp\u00e9titions
+          <Link to="/competitions" className="inline-flex items-center gap-2 text-sm text-text-muted hover:text-white transition-colors mb-8 bg-black/20 backdrop-blur-md px-4 py-2 rounded-full border border-white/5">
+            <ArrowLeft size={16} /> Retour au calendrier
           </Link>
 
-          <div className="glass rounded-2xl p-8 lg:p-10">
-            <div className="flex items-center gap-3 mb-4">
-              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${status.color}`}>{status.label}</span>
-              <span className="px-3 py-1 rounded-full bg-bordeaux/20 text-bordeaux-light text-xs font-semibold">{comp.type}</span>
+          <div className="glass rounded-[2.5rem] p-8 lg:p-12 border-white/5 shadow-2xl overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-8">
+              <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-xl border border-white/10 ${status.color}`}>
+                <span className={`w-2 h-2 rounded-full ${status.dot}`} />
+                {status.label}
+              </span>
             </div>
 
-            <h1 className="font-[var(--font-display)] text-3xl sm:text-4xl font-bold text-text-primary mb-6">{comp.name}</h1>
+            <div className="inline-flex px-3 py-1 rounded-lg bg-bordeaux/20 text-bordeaux-light text-[10px] font-black uppercase tracking-widest mb-6 border border-bordeaux/10">
+              {comp.type}
+            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-              <div className="bg-bg-tertiary rounded-xl p-4 flex items-center gap-3">
-                <MapPin size={20} className="text-emerald-light flex-shrink-0" />
-                <div>
-                  <div className="text-xs text-text-muted">Lieu</div>
-                  <div className="text-sm font-medium text-text-primary">{comp.location}</div>
+            <h1 className="font-[var(--font-display)] text-4xl sm:text-5xl font-bold text-white mb-8 tracking-tight leading-tight">{comp.name}</h1>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
+              <div className="bg-white/5 rounded-2xl p-6 border border-white/5 transition-colors hover:border-emerald/20 group">
+                <MapPin size={24} className="text-emerald-light mb-4 group-hover:scale-110 transition-transform" />
+                <div className="text-[10px] text-text-muted font-bold uppercase tracking-widest mb-1">Localisation</div>
+                <div className="text-lg font-bold text-white tracking-tight">{comp.location}</div>
+              </div>
+              <div className="bg-white/5 rounded-2xl p-6 border border-white/5 transition-colors hover:border-gold/20 group">
+                <Calendar size={24} className="text-gold mb-4 group-hover:scale-110 transition-transform" />
+                <div className="text-[10px] text-text-muted font-bold uppercase tracking-widest mb-1">Dates</div>
+                <div className="text-lg font-bold text-white tracking-tight leading-snug">
+                  {new Date(comp.startDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} — {new Date(comp.endDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </div>
               </div>
-              <div className="bg-bg-tertiary rounded-xl p-4 flex items-center gap-3">
-                <Calendar size={20} className="text-gold flex-shrink-0" />
-                <div>
-                  <div className="text-xs text-text-muted">Dates</div>
-                  <div className="text-sm font-medium text-text-primary">
-                    {new Date(comp.startDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} - {new Date(comp.endDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </div>
-                </div>
-              </div>
-              <div className="bg-bg-tertiary rounded-xl p-4 flex items-center gap-3">
-                <Users size={20} className="text-bordeaux-light flex-shrink-0" />
-                <div>
-                  <div className="text-xs text-text-muted">Participants</div>
-                  <div className="text-sm font-medium text-text-primary">{comp.participants}</div>
-                </div>
+              <div className="bg-white/5 rounded-2xl p-6 border border-white/5 transition-colors hover:border-bordeaux-light/20 group">
+                <Users size={24} className="text-bordeaux-light mb-4 group-hover:scale-110 transition-transform" />
+                <div className="text-[10px] text-text-muted font-bold uppercase tracking-widest mb-1">Affluence</div>
+                <div className="text-lg font-bold text-white tracking-tight">{comp.participants} inscrits</div>
               </div>
             </div>
 
-            <p className="text-text-secondary leading-relaxed mb-8">{comp.description}</p>
+            <div className="prose prose-invert max-w-none">
+              <h3 className="text-lg font-bold text-emerald-light uppercase tracking-widest mb-4">À propos de l'événement</h3>
+              <p className="text-xl text-text-secondary leading-relaxed font-light italic">"{comp.description}"</p>
+            </div>
 
             {comp.results && comp.results.length > 0 && (
-              <div className="border-t border-border-subtle pt-8">
-                <h3 className="font-[var(--font-display)] text-xl font-bold text-text-primary mb-4 flex items-center gap-2">
-                  <Trophy size={20} className="text-gold" /> R\u00e9sultats
+              <div className="mt-12 pt-12 border-t border-white/5">
+                <h3 className="font-[var(--font-display)] text-2xl font-bold text-white mb-8 flex items-center gap-3">
+                  <Trophy size={24} className="text-gold" /> Podium & Classement
                 </h3>
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-4">
                   {comp.results.map(r => (
-                    <div key={r.rank} className="flex items-center justify-between bg-bg-tertiary rounded-xl p-4">
-                      <div className="flex items-center gap-4">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm ${
-                          r.rank === 1 ? 'bg-gold/20 text-gold' : r.rank === 2 ? 'bg-gray-300/20 text-gray-300' : 'bg-amber-700/20 text-amber-600'
+                    <div key={r.rank} className="flex items-center justify-between bg-white/5 hover:bg-white/[0.08] border border-white/5 rounded-2xl p-5 transition-all group">
+                      <div className="flex items-center gap-6">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-lg shadow-xl ${
+                          r.rank === 1 ? 'bg-gradient-to-br from-gold to-gold-dark text-bg-primary' : 
+                          r.rank === 2 ? 'bg-gradient-to-br from-gray-200 to-gray-400 text-bg-primary' : 
+                          'bg-gradient-to-br from-amber-700 to-amber-900 text-white'
                         }`}>
                           {r.rank}
                         </div>
                         <div>
-                          <div className="font-medium text-text-primary">{r.player}</div>
-                          <div className="text-xs text-text-muted">{r.country}</div>
+                          <div className="text-lg font-bold text-white group-hover:text-gold transition-colors">{r.player}</div>
+                          <div className="text-xs text-text-muted font-bold uppercase tracking-widest">{r.country}</div>
                         </div>
                       </div>
-                      <div className="font-mono font-bold text-emerald-light">{r.score} pts</div>
+                      <div className="text-right">
+                        <div className="text-2xl font-black font-mono text-emerald-light leading-none">{r.score}</div>
+                        <div className="text-[9px] text-text-muted font-bold uppercase tracking-widest mt-1">Points cumulés</div>
+                      </div>
                     </div>
                   ))}
                 </div>

@@ -32,20 +32,16 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8">
           {/* Brand */}
           <div className="lg:col-span-2">
-            <Link to="/" className="flex items-center gap-3 mb-5">
-              <div className="flex gap-0.5">
-                {['S', 'P'].map((l, i) => (
-                  <div
-                    key={i}
-                    className="w-8 h-8 flex items-center justify-center rounded bg-gradient-to-br from-emerald to-emerald-dark text-white font-bold font-[var(--font-display)] text-sm"
-                  >
-                    {l}
-                  </div>
-                ))}
+            <Link to="/" className="flex items-center gap-3 mb-6 group">
+              <div className="relative">
+                <div className="w-9 h-9 bg-emerald rounded-lg flex items-center justify-center rotate-[-6deg] group-hover:rotate-0 transition-transform duration-500 shadow-lg shadow-emerald/20">
+                  <span className="text-white font-black text-xl font-[var(--font-display)]">S</span>
+                </div>
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-gold rounded-full border-2 border-bg-secondary shadow-sm" />
               </div>
               <div>
-                <span className="text-lg font-bold font-[var(--font-display)] text-text-primary">Scrabble</span>
-                <span className="text-lg font-bold font-[var(--font-display)] text-gold"> Pro</span>
+                <span className="text-xl font-bold text-white tracking-tight">Scrabble</span>
+                <span className="text-xl font-light text-white/60 tracking-tight ml-1">Pro</span>
               </div>
             </Link>
             <p className="text-text-secondary text-sm leading-relaxed max-w-sm mb-6">
